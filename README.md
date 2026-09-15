@@ -2,9 +2,10 @@
 
 Public web build for social and store linking.
 
-- Play: `/` or `/sky-hop.html`
-- Privacy: `/privacy.html`
-- Terms: `/terms.html`
-- Legal index: `/legal-index.html`
+- Play: https://dannymac1992dm-tech.github.io/sky-hop/
+- Privacy: https://dannymac1992dm-tech.github.io/sky-hop/privacy.html
+- Terms: https://dannymac1992dm-tech.github.io/sky-hop/terms.html
+- Legal index: https://dannymac1992dm-tech.github.io/sky-hop/legal-index.html
+- Repo: https://github.com/dannymac1992dm-tech/sky-hop
 
 Publisher: Danny Oudeesh
