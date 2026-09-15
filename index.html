@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#6ec6ff" />
+  <title>Sky Hop</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game" width="400" height="600" aria-label="Sky Hop game canvas"></canvas>
+    <div id="hud-btns">
+      <button id="extras-btn" type="button" aria-label="Toggle extras" title="Extras on/off" aria-pressed="false">✨</button>
+      <button id="mute-btn" type="button" aria-label="Toggle sound" title="Mute / unmute">🔊</button>
+    </div>
+    <span id="mute-hint" hidden>Muted</span>
+    <span id="extras-hint" hidden>Extras off</span>
+  </div>
+  <script src="ads.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
