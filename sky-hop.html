@@ -500,6 +500,7 @@ html, body {
   const PLAY_H = H - GROUND_H;
 
   const STORAGE_KEY = "skyhop_best";
+  const BEST_LEVEL_KEY = "skyhop_best_level";
   const MUTE_KEY = "skyhop_mute";
   const EXTRAS_KEY = "skyhop_extras";
   const TROPHY_KEY = "skyhop_trophies";
@@ -510,6 +511,7 @@ html, body {
   let prevMenuState = State.START;
   let score = 0;
   let best = parseInt(localStorage.getItem(STORAGE_KEY) || "0", 10) || 0;
+  let bestLevel = parseInt(localStorage.getItem(BEST_LEVEL_KEY) || "0", 10) || 0;
   let muted = localStorage.getItem(MUTE_KEY) === "1";
   // Extras default ON for first-time players
   let extrasOn = localStorage.getItem(EXTRAS_KEY) !== "0";
@@ -520,22 +522,88 @@ html, body {
   let level = 1;
   let levelFlash = 0;
   let levelFlashText = "";
+  let milestoneFlash = 0;
+  let milestoneFlashText = "";
   let trophyFlash = 0;
   let trophyFlashText = "";
   let trophyScroll = 0;
   let trophyDragY = null;
   let trophyDragScroll = 0;
+  let newRecordFlash = 0;
+  let newRecordText = "";
+  let beatBestScore = false;
+  let beatBestLevel = false;
+  // Streak / near-miss juice
+  let cleanStreak = 0;
+  let pipeStreak = 0;
+  let scoreMult = 1;
+  let multPop = 0;
+  let nearMissFlash = 0;
+  const particles = [];
   // Rewarded continue: one per run; free Retry always available via flap/space
   let continueUsedThisRun = false;
   let invulnFrames = 0;
   let continueBusy = false;
 
-  // —— Trophies (levels 1–100) ——
-  const MAX_LEVEL = 100;
-  const trophyNames = buildTrophyNames();
-  let unlocked = loadTrophies();
+  // —— Levels & trophies (scalable to 10,000) ——
+  const MAX_LEVEL = 10000;
+  // Named landmark trophies (shelf highlights)
+  const LANDMARKS = [1, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+  const LANDMARK_NAMES = {
+    1: "First Flap",
+    10: "Tenfold Glide",
+    50: "Halfway Horizon",
+    100: "Century Crown",
+    250: "Sky Voyager",
+    500: "Endurance Emblem",
+    1000: "Millennium Wing",
+    2500: "Storm Rider Seal",
+    5000: "Aether Titan",
+    10000: "Sky Master Eternal",
+  };
+  // Persist only highest reached (unlocks 1..highest). Tiny localStorage payload.
+  let highestUnlocked = loadHighestUnlocked();
+  // Seed best-level from trophy peak for players upgrading from older builds
+  if (highestUnlocked > bestLevel) {
+    bestLevel = highestUnlocked;
+    try { localStorage.setItem(BEST_LEVEL_KEY, String(bestLevel)); } catch (_) {}
+  }
 
-  function buildTrophyNames() {
+  function loadHighestUnlocked() {
+    try {
+      const raw = localStorage.getItem(TROPHY_KEY);
+      if (!raw) return 0;
+      const data = JSON.parse(raw);
+      if (typeof data === "number") {
+        return Math.max(0, Math.min(MAX_LEVEL, data | 0));
+      }
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const h = parseInt(data.h != null ? data.h : data.highest, 10);
+        if (Number.isFinite(h)) return Math.max(0, Math.min(MAX_LEVEL, h));
+      }
+      // Legacy: array of unlocked level ids → migrate to highest
+      if (Array.isArray(data)) {
+        let h = 0;
+        for (const n of data) {
+          const v = parseInt(n, 10);
+          if (v > h) h = v;
+        }
+        h = Math.max(0, Math.min(MAX_LEVEL, h));
+        localStorage.setItem(TROPHY_KEY, JSON.stringify({ h }));
+        return h;
+      }
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function saveHighestUnlocked() {
+    localStorage.setItem(TROPHY_KEY, JSON.stringify({ h: highestUnlocked }));
+  }
+
+  function trophyNameFor(lv) {
+    if (LANDMARK_NAMES[lv]) return LANDMARK_NAMES[lv];
     const prefixes = [
       "Cloud", "Sky", "Wind", "Dawn", "Sun", "Mist", "Peak", "Breeze",
       "Nest", "Wing", "Feather", "Horizon", "Glide", "Zephyr", "Aether",
@@ -545,60 +613,72 @@ html, body {
       "Hop", "Badge", "Medal", "Crest", "Star", "Gem", "Seal", "Mark",
       "Token", "Emblem", "Charm", "Shard", "Spark", "Ring", "Orb",
     ];
-    const names = [];
-    for (let i = 1; i <= MAX_LEVEL; i++) {
-      const p = prefixes[(i - 1) % prefixes.length];
-      const s = suffixes[Math.floor((i - 1) / prefixes.length) % suffixes.length];
-      names[i] = p + " " + s;
-      if (i === 1) names[i] = "First Flap";
-      if (i === 10) names[i] = "Tenfold Glide";
-      if (i === 25) names[i] = "Quarter Sky";
-      if (i === 50) names[i] = "Halfway Horizon";
-      if (i === 75) names[i] = "Three-Quarter Peak";
-      if (i === 100) names[i] = "Sky Master Crown";
-    }
-    return names;
+    const p = prefixes[(lv - 1) % prefixes.length];
+    const s = suffixes[Math.floor((lv - 1) / prefixes.length) % suffixes.length];
+    return p + " " + s;
   }
 
-  function loadTrophies() {
-    try {
-      const raw = localStorage.getItem(TROPHY_KEY);
-      if (!raw) return {};
-      const arr = JSON.parse(raw);
-      const map = {};
-      if (Array.isArray(arr)) {
-        for (const n of arr) {
-          const v = parseInt(n, 10);
-          if (v >= 1 && v <= MAX_LEVEL) map[v] = true;
-        }
-      }
-      return map;
-    } catch (_) {
-      return {};
-    }
+  function isShelfLevel(lv) {
+    if (lv < 1 || lv > MAX_LEVEL) return false;
+    if (LANDMARKS.indexOf(lv) >= 0) return true;
+    if (lv === highestUnlocked && lv > 0) return true;
+    // Milestone cadence: every 10 early, every 50 mid, every 100 late
+    if (lv <= 100) return lv % 10 === 0;
+    if (lv <= 1000) return lv % 50 === 0;
+    return lv % 100 === 0;
   }
 
-  function saveTrophies() {
-    const arr = [];
-    for (let i = 1; i <= MAX_LEVEL; i++) if (unlocked[i]) arr.push(i);
-    localStorage.setItem(TROPHY_KEY, JSON.stringify(arr));
+  /** Build finite shelf list (milestones + landmarks + peak) — never 10k rows. */
+  function buildShelfLevels() {
+    const set = {};
+    for (const lv of LANDMARKS) set[lv] = true;
+    if (highestUnlocked > 0) set[highestUnlocked] = true;
+    // Include milestones up to max(highest, 100) so locked upcoming goals show
+    const showTo = Math.min(MAX_LEVEL, Math.max(highestUnlocked, 100));
+    for (let lv = 10; lv <= showTo; lv++) {
+      if (isShelfLevel(lv)) set[lv] = true;
+    }
+    // A few locked lookahead milestones past peak
+    const lookahead = [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+    for (const lv of lookahead) {
+      if (lv > highestUnlocked && lv <= MAX_LEVEL) set[lv] = true;
+    }
+    return Object.keys(set).map(Number).sort((a, b) => a - b);
   }
+
+  let shelfLevels = buildShelfLevels();
 
   function unlockTrophy(lv) {
     if (lv < 1 || lv > MAX_LEVEL) return false;
-    if (unlocked[lv]) return false;
-    unlocked[lv] = true;
-    saveTrophies();
-    trophyFlash = 1;
-    trophyFlashText = "🏆 " + trophyNames[lv];
-    sfxTrophy();
+    if (lv <= highestUnlocked) return false;
+    const prev = highestUnlocked;
+    highestUnlocked = lv;
+    saveHighestUnlocked();
+    shelfLevels = buildShelfLevels();
+    // Celebrate landmarks & shelf milestones; always toast peak
+    const named = LANDMARK_NAMES[lv] || (isShelfLevel(lv) ? trophyNameFor(lv) : null);
+    if (named || lv === highestUnlocked) {
+      trophyFlash = 1;
+      trophyFlashText = "🏆 " + (named || ("Peak Level " + lv));
+      sfxTrophy();
+    }
+    // Also toast if we crossed a landmark between prev+1..lv (continue / big jumps)
+    for (const mark of LANDMARKS) {
+      if (mark > prev && mark <= lv && mark !== lv) {
+        trophyFlash = 1;
+        trophyFlashText = "🏆 " + LANDMARK_NAMES[mark];
+        sfxTrophy();
+      }
+    }
     return true;
   }
 
   function trophyCount() {
-    let n = 0;
-    for (let i = 1; i <= MAX_LEVEL; i++) if (unlocked[i]) n++;
-    return n;
+    return highestUnlocked;
+  }
+
+  function formatLevel(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
   // —— Player ——
@@ -615,16 +695,26 @@ html, body {
   const FLAP = -7.2;
   const MAX_FALL = 10;
 
-  // —— Levels (1–100) ——
+  // —— Levels (1–10000) ——
+  // Level = min(MAX_LEVEL, 1 + floor(score / PIPES_PER_LEVEL))
+  // With PIPES_PER_LEVEL=5: score 0–4 → L1 … L10000 from score 49995+.
   const PIPES_PER_LEVEL = 5;
   const BASE_SPEED = 2.4;
-  const MAX_SPEED = 4.15;
+  const MAX_SPEED = 4.15;       // soft-capped via difficultyT()
   const BASE_GAP = 148;
-  const MIN_GAP = 102;
+  const MIN_GAP = 102;          // never tighter — endurance after mid-game
   const BASE_SPAWN = 95;
   const MIN_SPAWN = 70;
   const BASE_GAP_MARGIN = 40;
   const MAX_GAP_MARGIN = 58;
+  // Entity caps (mobile-safe — never unbounded)
+  const MAX_TREES = 14;
+  const MAX_ANIMALS = 8;
+  const MAX_HUNTERS = 3;
+  const MAX_PROJECTILES = 8;
+  const MAX_WATERFALLS = 4;
+  const MAX_PARTICLES = 48;
+  const NEAR_MISS_PX = 14;
 
   // —— Pipes ——
   const pipes = [];
@@ -834,6 +924,27 @@ html, body {
     setTimeout(() => beep(554, 0.08, "triangle", 0.06), 60);
     setTimeout(() => beep(659, 0.12, "triangle", 0.07), 130);
   }
+  function sfxMilestone() {
+    beep(523, 0.07, "triangle", 0.06);
+    setTimeout(() => beep(659, 0.08, "triangle", 0.065), 70);
+    setTimeout(() => beep(784, 0.1, "triangle", 0.07), 140);
+    setTimeout(() => beep(1046, 0.14, "sine", 0.05), 220);
+  }
+  function sfxNearMiss() {
+    beep(980, 0.04, "sine", 0.035);
+    setTimeout(() => beep(1320, 0.05, "sine", 0.03), 40);
+  }
+  function sfxStreak() {
+    beep(700, 0.05, "triangle", 0.04);
+    setTimeout(() => beep(940, 0.07, "triangle", 0.045), 50);
+  }
+  function sfxNewRecord() {
+    beep(392, 0.08, "triangle", 0.06);
+    setTimeout(() => beep(523, 0.08, "triangle", 0.06), 80);
+    setTimeout(() => beep(659, 0.09, "triangle", 0.065), 160);
+    setTimeout(() => beep(784, 0.12, "triangle", 0.07), 250);
+    setTimeout(() => beep(1046, 0.16, "sine", 0.055), 360);
+  }
 
   // —— Mute / Extras UI ——
   function updateMuteUI() {
@@ -899,16 +1010,31 @@ html, body {
   }
 
   // —— Levels & difficulty ——
+  // Soft-cap curve: most speed/gap ramp happens early→mid, then asymptotes.
+  // t(L) = 1 - exp(-k*(L-1)), k=0.006 → ~47% @100, ~70% @200, ~91% @400,
+  // ~95% @500, ~99.8% @1000. Levels ~500–10000 are endurance/score, not tighter gaps.
+  const DIFF_K = 0.006;
+
   function levelFromScore(s) {
     return Math.min(MAX_LEVEL, 1 + Math.floor(s / PIPES_PER_LEVEL));
   }
 
+  function difficultyT(lv) {
+    const x = Math.max(0, Math.min(lv, MAX_LEVEL) - 1);
+    return 1 - Math.exp(-DIFF_K * x);
+  }
+
   function applyDifficulty() {
-    const t = (Math.min(level, MAX_LEVEL) - 1) / (MAX_LEVEL - 1);
+    const t = difficultyT(level);
     pipeSpeed = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t;
     pipeGap = BASE_GAP + (MIN_GAP - BASE_GAP) * t;
     spawnEvery = Math.round(BASE_SPAWN + (MIN_SPAWN - BASE_SPAWN) * t);
     gapMargin = BASE_GAP_MARGIN + (MAX_GAP_MARGIN - BASE_GAP_MARGIN) * t;
+  }
+
+  function updateScoreMult() {
+    // 1.0 → 2.5 based on clean streak (no near-miss)
+    scoreMult = Math.min(2.5, 1 + Math.floor(cleanStreak / 3) * 0.25);
   }
 
   function onScoreChanged() {
@@ -917,10 +1043,102 @@ html, body {
     applyDifficulty();
     if (level > prev) {
       levelFlash = 1;
-      levelFlashText = "Level " + level;
+      levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
+      // Milestone celebrations
+      if (level % 1000 === 0) {
+        milestoneFlash = 1.2;
+        milestoneFlashText = "✦ " + formatLevel(level) + " MILESTONE ✦";
+        sfxMilestone();
+      } else if (level % 100 === 0) {
+        milestoneFlash = 1.1;
+        milestoneFlashText = "★ Level " + formatLevel(level) + "! ★";
+        sfxMilestone();
+      } else if (level % 10 === 0) {
+        milestoneFlash = 1;
+        milestoneFlashText = "Level " + formatLevel(level);
+        sfxLevel();
+      }
     }
+  }
+
+  function spawnParticles(x, y, n, color) {
+    const count = Math.min(n, MAX_PARTICLES - particles.length);
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 3.5;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 1,
+        life: 18 + Math.random() * 16,
+        max: 34,
+        color: color || "#ffe566",
+        r: 1.5 + Math.random() * 2.5,
+      });
+    }
+  }
+
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12;
+      p.life--;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Clearance to gap edge when scoring a pipe; small = near-miss. */
+  function pipeClearance(p) {
+    const top = p.gapY - p.gap / 2;
+    const bot = p.gapY + p.gap / 2;
+    const toTop = bird.y - bird.r - top;
+    const toBot = bot - (bird.y + bird.r);
+    return Math.min(toTop, toBot);
+  }
+
+  function onPipeScored(p) {
+    const clearance = pipeClearance(p);
+    const nearMiss = clearance < NEAR_MISS_PX;
+    pipeStreak++;
+    if (nearMiss) {
+      cleanStreak = 0;
+      nearMissFlash = 1;
+      spawnParticles(bird.x + 10, bird.y, 12, "#fff6a0");
+      spawnParticles(bird.x, bird.y - 8, 8, "#ffd54a");
+      sfxNearMiss();
+    } else {
+      cleanStreak++;
+      if (cleanStreak > 0 && cleanStreak % 3 === 0) {
+        multPop = 1;
+        sfxStreak();
+        spawnParticles(W / 2, 100, 10, "#a0ffd0");
+      }
+    }
+    updateScoreMult();
+    // Base +1 always (level formula). Bonus points from clean streak (capped).
+    let add = 1;
+    if (scoreMult >= 2) add += 1;
+    if (scoreMult >= 2.5) add += 1;
+    if (nearMiss) add += 0; // sparkle only — no streak bonus
+    score += add;
+    scorePop = 1;
+    onScoreChanged();
+    sfxScore();
   }
 
   // —— Reset ——
@@ -951,8 +1169,20 @@ html, body {
     overTimer = 0;
     levelFlash = 0;
     levelFlashText = "";
+    milestoneFlash = 0;
+    milestoneFlashText = "";
     trophyFlash = 0;
     trophyFlashText = "";
+    newRecordFlash = 0;
+    newRecordText = "";
+    beatBestScore = false;
+    beatBestLevel = false;
+    cleanStreak = 0;
+    pipeStreak = 0;
+    scoreMult = 1;
+    multPop = 0;
+    nearMissFlash = 0;
+    particles.length = 0;
     clearExtras();
     applyDifficulty();
   }
@@ -979,10 +1209,28 @@ html, body {
     flash = 1;
     softenMusic();
     sfxHit();
+    beatBestScore = false;
+    beatBestLevel = false;
     if (score > best) {
       best = score;
       localStorage.setItem(STORAGE_KEY, String(best));
+      beatBestScore = true;
     }
+    if (level > bestLevel) {
+      bestLevel = level;
+      localStorage.setItem(BEST_LEVEL_KEY, String(bestLevel));
+      beatBestLevel = true;
+    }
+    if (beatBestScore || beatBestLevel) {
+      newRecordFlash = 1.25;
+      if (beatBestScore && beatBestLevel) newRecordText = "✦ NEW RECORD ✦";
+      else if (beatBestScore) newRecordText = "✦ BEST SCORE ✦";
+      else newRecordText = "✦ BEST LEVEL ✦";
+      sfxNewRecord();
+    }
+    cleanStreak = 0;
+    pipeStreak = 0;
+    scoreMult = 1;
     notifyAdsState();
   }
 
@@ -1033,7 +1281,9 @@ html, body {
   function openTrophies() {
     prevMenuState = state === State.TROPHIES ? prevMenuState : state;
     state = State.TROPHIES;
+    shelfLevels = buildShelfLevels();
     trophyScroll = 0;
+    notifyAdsState();
   }
 
   function closeTrophies() {
@@ -1167,7 +1417,8 @@ html, body {
   function clampTrophyScroll() {
     const rowH = 52;
     const visible = 8;
-    const maxScroll = Math.max(0, (MAX_LEVEL - visible) * rowH);
+    const n = shelfLevels.length;
+    const maxScroll = Math.max(0, (n - visible) * rowH);
     trophyScroll = Math.max(0, Math.min(maxScroll, trophyScroll));
   }
 
@@ -1226,7 +1477,8 @@ html, body {
   function spawnTree(forceHazard) {
     const layer = Math.random() < 0.45 ? "bg" : "fg";
     let hazard = false;
-    if (extrasOn && (forceHazard || (level >= 20 && Math.random() < 0.12 + level * 0.002))) {
+    const tDiff = difficultyT(level);
+    if (extrasOn && (forceHazard || (level >= 20 && Math.random() < 0.12 + tDiff * 0.2))) {
       hazard = true;
     }
     // Light scenery trees even when extras off (bg only, never hazard)
@@ -1267,7 +1519,7 @@ html, body {
       y = PLAY_H - 18;
     }
     // Mild hazards from mid levels: a few faster critters
-    const hazard = level >= 30 && Math.random() < 0.18 + (level - 30) * 0.003;
+    const hazard = level >= 30 && Math.random() < 0.18 + difficultyT(level) * 0.22;
     if (hazard && nearPipeGap(W + 30, y, 28)) {
       y = Math.min(PLAY_H - 40, y + 50);
     }
@@ -1302,23 +1554,24 @@ html, body {
   }
 
   function spawnWaterfall() {
-    const push = extrasOn && level >= 18 && Math.random() < 0.35 + level * 0.002;
+    const push = extrasOn && level >= 18 && Math.random() < 0.35 + difficultyT(level) * 0.25;
     let x = W + 20;
     // Don't put push zones smack in pipe gaps vertically — width is vertical band
     waterfalls.push({
       x,
       w: 36 + Math.random() * 28,
-      push: push ? 0.12 + Math.min(0.18, level * 0.0015) : 0,
+      push: push ? 0.12 + 0.18 * difficultyT(level) : 0,
       phase: Math.random() * Math.PI * 2,
     });
   }
 
   function fireProjectile(h) {
+    if (projectiles.length >= MAX_PROJECTILES) return;
     const kind = h.kind;
     projectiles.push({
       x: h.x - 10,
       y: h.y + 8,
-      vx: -(2.2 + Math.min(1.6, level * 0.015)),
+      vx: -(2.2 + 1.6 * difficultyT(level)),
       vy: (bird.y - h.y) * 0.008, // mild aim, still dodgeable
       kind,
       r: kind === "net" ? 14 : 7,
@@ -1331,35 +1584,36 @@ html, body {
     const scroll = pipeSpeed;
     const playing = state === State.PLAY;
 
-    // Spawns
+    // Spawns (soft-capped cadence + hard entity caps for mobile)
     if (playing) {
+      const tD = difficultyT(level);
       nextTree--;
       if (nextTree <= 0) {
-        spawnTree(false);
+        if (trees.length < MAX_TREES) spawnTree(false);
         nextTree = extrasOn
-          ? Math.max(35, 90 - level * 0.4)
+          ? Math.max(40, 90 - tD * 50)
           : 100 + Math.random() * 80;
       }
       if (extrasOn) {
         nextAnimal--;
         if (nextAnimal <= 0 && level >= 8) {
-          spawnAnimal();
-          nextAnimal = Math.max(55, 140 - level * 0.7);
+          if (animals.length < MAX_ANIMALS) spawnAnimal();
+          nextAnimal = Math.max(70, 140 - tD * 65);
         }
         nextHunter--;
         if (nextHunter <= 0 && level >= 35) {
-          spawnHunter();
-          const dens = Math.max(90, 260 - level * 1.2);
+          if (hunters.length < MAX_HUNTERS) spawnHunter();
+          // Floor ~120 frames even at soft-cap — never spam
+          const dens = Math.max(120, 260 - tD * 130);
           nextHunter = dens + Math.random() * 40;
         }
         nextWaterfall--;
         if (nextWaterfall <= 0 && level >= 5) {
-          spawnWaterfall();
-          nextWaterfall = Math.max(100, 220 - level * 0.8);
+          if (waterfalls.length < MAX_WATERFALLS) spawnWaterfall();
+          nextWaterfall = Math.max(120, 220 - tD * 90);
         }
       } else if (playing && frame % 180 === 0) {
-        // rare light bg tree when extras off
-        spawnTree(false);
+        if (trees.length < MAX_TREES) spawnTree(false);
       }
     }
 
@@ -1424,7 +1678,7 @@ html, body {
         h.shootCD--;
         if (h.shootCD <= 0 && h.x < W - 20 && h.x > 40) {
           fireProjectile(h);
-          h.shootCD = Math.max(55, 110 - level * 0.35);
+          h.shootCD = Math.max(70, 110 - difficultyT(level) * 40);
         }
         // Body collision
         if (circleRect(bird.x, bird.y, bird.r - 2, h.x - 14, h.y - 18, 28, 36)) {
@@ -1459,9 +1713,14 @@ html, body {
     if (flash > 0) flash *= 0.88;
     if (scorePop > 0) scorePop *= 0.9;
     if (levelFlash > 0) levelFlash *= 0.94;
+    if (milestoneFlash > 0) milestoneFlash *= 0.955;
     if (trophyFlash > 0) trophyFlash *= 0.96;
+    if (newRecordFlash > 0) newRecordFlash *= 0.97;
+    if (multPop > 0) multPop *= 0.92;
+    if (nearMissFlash > 0) nearMissFlash *= 0.9;
     if (bird.wing > 0) bird.wing *= 0.85;
     if (invulnFrames > 0) invulnFrames--;
+    updateParticles();
 
     if (state === State.TROPHIES) return;
 
@@ -1512,10 +1771,7 @@ html, body {
 
       if (!p.scored && p.x + p.w < bird.x) {
         p.scored = true;
-        score++;
-        scorePop = 1;
-        onScoreChanged();
-        sfxScore();
+        onPipeScored(p);
       }
 
       if (hitPipe(p)) {
@@ -1930,8 +2186,8 @@ html, body {
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "bold 16px 'Segoe UI', system-ui, sans-serif";
-    const lv = "Level " + level;
+    ctx.font = "bold 15px 'Segoe UI', system-ui, sans-serif";
+    const lv = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(0,0,0,0.28)";
     ctx.strokeText(lv, W / 2, 82);
@@ -1939,13 +2195,41 @@ html, body {
     ctx.fillText(lv, W / 2, 82);
     ctx.restore();
 
+    // Combo / multiplier
+    if (state === State.PLAY && (scoreMult > 1 || cleanStreak >= 2)) {
+      ctx.save();
+      const ms = 1 + multPop * 0.3;
+      ctx.translate(W / 2, 102);
+      ctx.scale(ms, ms);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      const mt = "×" + (Math.round(scoreMult * 100) / 100) + "  ·  streak " + cleanStreak;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,40,20,0.3)";
+      ctx.strokeText(mt, 0, 0);
+      ctx.fillStyle = scoreMult >= 2 ? "#7dffb0" : "#c8ffe0";
+      ctx.fillText(mt, 0, 0);
+      ctx.restore();
+    }
+
+    if (nearMissFlash > 0.05 && state === State.PLAY) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, nearMissFlash);
+      ctx.textAlign = "center";
+      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillStyle = "#fff6a0";
+      ctx.fillText("Close call!", W / 2, bird.y - 36);
+      ctx.restore();
+    }
+
     if (levelFlash > 0.04 && state === State.PLAY) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, levelFlash * 1.15);
-      const y = 118 + (1 - levelFlash) * 10;
+      const y = 122 + (1 - levelFlash) * 10;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 22px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 20px 'Segoe UI', system-ui, sans-serif";
       ctx.lineWidth = 4;
       ctx.strokeStyle = "rgba(0,40,80,0.35)";
       ctx.strokeText(levelFlashText, W / 2, y);
@@ -1954,18 +2238,48 @@ html, body {
       ctx.restore();
     }
 
+    if (milestoneFlash > 0.05 && state === State.PLAY) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, milestoneFlash);
+      const y = 150 + (1 - Math.min(1, milestoneFlash)) * 12;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 18px 'Segoe UI', system-ui, sans-serif";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(60,20,80,0.4)";
+      ctx.strokeText(milestoneFlashText, W / 2, y);
+      ctx.fillStyle = "#ff9cf0";
+      ctx.fillText(milestoneFlashText, W / 2, y);
+      ctx.restore();
+    }
+
     if (trophyFlash > 0.05) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, trophyFlash * 1.2);
-      const y = 148 + (1 - trophyFlash) * 14;
+      const y = 172 + (1 - trophyFlash) * 14;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 15px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(40,20,0,0.4)";
       ctx.strokeText(trophyFlashText, W / 2, y);
       ctx.fillStyle = "#ffd700";
       ctx.fillText(trophyFlashText, W / 2, y);
+      ctx.restore();
+    }
+
+    if (newRecordFlash > 0.05 && state === State.OVER) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, newRecordFlash);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 22px 'Segoe UI', system-ui, sans-serif";
+      const y = 28 + Math.sin(frame * 0.2) * 2;
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(80,40,0,0.45)";
+      ctx.strokeText(newRecordText, W / 2, y);
+      ctx.fillStyle = "#ffd24a";
+      ctx.fillText(newRecordText, W / 2, y);
       ctx.restore();
     }
   }
@@ -2049,7 +2363,7 @@ html, body {
 
     ctx.font = "14px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillText("100 levels — every " + PIPES_PER_LEVEL + " pipes", W / 2, 136);
+    ctx.fillText(formatLevel(MAX_LEVEL) + " levels — every " + PIPES_PER_LEVEL + " pipes", W / 2, 136);
 
     if (extrasOn) {
       ctx.fillStyle = "rgba(255,255,200,0.7)";
@@ -2067,25 +2381,29 @@ html, body {
     ctx.fillText("Tap / Space to start", W / 2, PLAY_H - 40);
     ctx.globalAlpha = 1;
 
-    if (best > 0) {
-      ctx.globalAlpha = 0.85;
-      ctx.font = "15px 'Segoe UI', system-ui, sans-serif";
-      ctx.fillText("Best: " + best + "  ·  🏆 " + trophyCount() + "/" + MAX_LEVEL, W / 2, PLAY_H - 14);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.globalAlpha = 0.75;
-      ctx.font = "14px 'Segoe UI', system-ui, sans-serif";
-      ctx.fillText("🏆 " + trophyCount() + "/" + MAX_LEVEL, W / 2, PLAY_H - 14);
-      ctx.globalAlpha = 1;
-    }
+    ctx.globalAlpha = 0.85;
+    ctx.font = "13px 'Segoe UI', system-ui, sans-serif";
+    const bestBits = [];
+    if (best > 0) bestBits.push("Best score " + best);
+    if (bestLevel > 0) bestBits.push("Best level " + formatLevel(bestLevel));
+    bestBits.push("🏆 " + formatLevel(trophyCount()));
+    ctx.fillText(bestBits.join("  ·  "), W / 2, PLAY_H - 14);
+    ctx.globalAlpha = 1;
   }
 
   function drawOver() {
     uiButtons.trophies = null;
     uiButtons.continue = null;
+    const lines = [
+      "Level  " + formatLevel(level),
+      "Score  " + score,
+      "Best score  " + best,
+      "Best level  " + formatLevel(bestLevel),
+    ];
+    if (beatBestScore || beatBestLevel) lines.push("✦ New record!");
     const panel = drawPanel(
       "Game Over",
-      ["Level  " + level, "Score  " + score, "Best   " + best, "Trophies  " + trophyCount() + "/" + MAX_LEVEL],
+      lines,
       overTimer > 18 ? "Tap / Space to retry (free)" : "…"
     );
     // Keep Retry / continue / trophies above native banner (padding via --ad-banner-pad)
@@ -2185,9 +2503,13 @@ html, body {
     ctx.font = "bold 26px 'Segoe UI', system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Trophy Shelf", W / 2, 42);
-    ctx.font = "14px 'Segoe UI', system-ui, sans-serif";
+    ctx.font = "13px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,220,120,0.9)";
-    ctx.fillText(trophyCount() + " / " + MAX_LEVEL + " unlocked", W / 2, 66);
+    ctx.fillText(
+      "Peak " + formatLevel(highestUnlocked) + " / " + formatLevel(MAX_LEVEL) +
+      "  ·  milestones shown",
+      W / 2, 66
+    );
 
     // Back button
     const bw = 80;
@@ -2204,24 +2526,29 @@ html, body {
     ctx.fillText("← Back", bx + bw / 2, by + bh / 2);
     uiButtons.back = { x: bx, y: by, w: bw, h: bh };
 
-    // List area
+    // Finite milestone list (not 10k rows)
     const listTop = 88;
     const listBot = H - 24;
     const rowH = 52;
+    const levels = shelfLevels;
     ctx.save();
     ctx.beginPath();
     ctx.rect(12, listTop, W - 24, listBot - listTop);
     ctx.clip();
 
     const startIdx = Math.floor(trophyScroll / rowH);
-    const endIdx = Math.min(MAX_LEVEL, startIdx + Math.ceil((listBot - listTop) / rowH) + 1);
+    const endIdx = Math.min(levels.length, startIdx + Math.ceil((listBot - listTop) / rowH) + 1);
 
     for (let i = startIdx; i < endIdx; i++) {
-      const lv = i + 1;
+      const lv = levels[i];
       const y = listTop + i * rowH - trophyScroll;
-      const on = !!unlocked[lv];
+      const on = lv <= highestUnlocked;
+      const isLandmark = LANDMARKS.indexOf(lv) >= 0;
+      const isPeak = lv === highestUnlocked && highestUnlocked > 0;
 
-      ctx.fillStyle = on ? "rgba(255,200,80,0.12)" : "rgba(255,255,255,0.05)";
+      ctx.fillStyle = on
+        ? (isLandmark ? "rgba(255,200,80,0.2)" : "rgba(255,200,80,0.1)")
+        : "rgba(255,255,255,0.05)";
       roundRect(20, y + 4, W - 40, rowH - 8, 10);
       ctx.fill();
 
@@ -2229,20 +2556,24 @@ html, body {
 
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
       ctx.fillStyle = on ? "#ffe8a0" : "rgba(180,190,200,0.55)";
-      ctx.fillText(on ? trophyNames[lv] : "Locked", 72, y + rowH / 2 - 8);
-      ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
+      let label = on ? trophyNameFor(lv) : "Locked";
+      if (isPeak && on) label = "★ " + label;
+      ctx.fillText(label, 72, y + rowH / 2 - 8);
+      ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
       ctx.fillStyle = on ? "rgba(255,230,160,0.7)" : "rgba(140,150,160,0.45)";
-      ctx.fillText("Level " + lv, 72, y + rowH / 2 + 10);
+      let sub = "Level " + formatLevel(lv);
+      if (isLandmark) sub += "  ·  landmark";
+      else if (isPeak) sub += "  ·  highest";
+      ctx.fillText(sub, 72, y + rowH / 2 + 10);
     }
     ctx.restore();
 
-    // Scroll hint
     ctx.fillStyle = "rgba(255,255,255,0.35)";
     ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Drag or scroll  ·  Esc to close", W / 2, H - 10);
+    ctx.fillText("Milestones · landmarks · peak  ·  Esc", W / 2, H - 10);
   }
 
   function drawFlash() {
@@ -2318,6 +2649,7 @@ html, body {
       if (state === State.OVER) drawOver();
     }
 
+    drawParticles();
     drawFlash();
     requestAnimationFrame(loop);
   }
