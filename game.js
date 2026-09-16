@@ -108,11 +108,11 @@
     },
   };
 
-  // —— Level bird evolution (every 5 levels) ——
+  // —— Bird evolution every 10 pipes (score) ——
   // Shop equippedBird = base skin for Hatchling (tier 0). From tier 1+ the
   // evolution ladder supplies a FULL distinct palette so forms are unmistakable.
   // Ladder has 10 distinct looks; higher tiers cycle with prestige glow shifts.
-  // Levels 1–4 → tier 0, 5–9 → tier 1, 10–14 → tier 2, …
+  // Pipes 0–9 → tier 0, 10–19 → tier 1, 20–29 → tier 2, …
   const EVOLUTION_LADDER = [
     {
       id: "hatchling", name: "Hatchling", accent: "none", feel: 0,
@@ -201,9 +201,10 @@
     "rgba(120,255,200,0.4)",
   ];
 
-  function evolutionTier(lv) {
-    const L = Math.max(1, Math.min(MAX_LEVEL, lv | 0));
-    return Math.floor(L / 5);
+  function evolutionTier(pipes) {
+    // Tier from pipes passed (score), not level — upgrade every 10 pipes.
+    const p = Math.max(0, pipes | 0);
+    return Math.floor(p / 10);
   }
 
   function evolutionMeta(lv) {
@@ -252,10 +253,10 @@
     return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
   }
 
-  function activeBirdPalette(lv) {
+  function activeBirdPalette(pipes) {
     const baseId = unlocks.equippedBird;
     const base = BIRD_PALETTES[baseId] || BIRD_PALETTES.bird_default;
-    const evo = evolutionMeta(lv == null ? level : lv);
+    const evo = evolutionMeta(pipes == null ? score : pipes);
     // Tier 0 (Hatchling): shop skin is the body.
     // Tier >= 1: evolution ladder palette IS the bird — clearly different each form.
     // Shop may lightly tint beak only; body/wings come entirely from evolution.
@@ -1016,11 +1017,11 @@
       levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
-      // Bird evolution every 5 levels (tier = floor(level/5))
-      const prevTier = evolutionTier(prev);
-      const nextTier = evolutionTier(level);
+      // Bird evolution every 10 pipes (tier = floor(score/10))
+      const prevTier = evolutionTier(score - 1); // score already incremented
+      const nextTier = evolutionTier(score);
       if (nextTier > prevTier) {
-        const evo = evolutionMeta(level);
+        const evo = evolutionMeta(score);
         evolveFlash = 1.25;
         evolveFlashText = "Bird evolved! " + evo.name;
         sfxMilestone();
@@ -2168,8 +2169,8 @@
     ctx.rotate(bird.rot);
 
     // Evolution feel: slightly snappier wing visual at higher tiers (cosmetic only)
-    const showLv = (state === State.PLAY || state === State.OVER) ? level : 1;
-    const pal = activeBirdPalette(showLv);
+    const showPipes = (state === State.PLAY || state === State.OVER) ? score : 0;
+    const pal = activeBirdPalette(showPipes);
     const evo = pal.evo;
     const birdId = pal.birdId;
     const wingBoost = 1 + (evo.feel || 0) * 0.35;
@@ -2528,7 +2529,7 @@
 
     // Current evolution form (top-left — clearly readable)
     if (state === State.PLAY) {
-      const evo = evolutionMeta(level);
+      const evo = evolutionMeta(score);
       const label = "Form: " + evo.name;
       ctx.save();
       ctx.textAlign = "left";
@@ -2691,7 +2692,7 @@
     const menuEvo = evolutionMeta(1);
     ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = "rgba(255,255,220,0.92)";
-    ctx.fillText("Form: " + menuEvo.name + "  ·  evolves every 5 levels", W / 2, 158);
+    ctx.fillText("Form: " + menuEvo.name + "  ·  evolves every 10 pipes", W / 2, 158);
 
     if (extrasOn) {
       ctx.fillStyle = "rgba(255,255,200,0.7)";

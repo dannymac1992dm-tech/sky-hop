@@ -66,9 +66,9 @@ localStorage.skyhop_trophies = { "h": 1247 }
 - A few locked lookahead landmarks
 
 
-## Bird evolution (every 5 levels)
+## Bird evolution (every 10 pipes)
 
-During a run the bird **evolves every 5 levels** (`tier = floor(level / 10)`). Shop `equippedBird` stays the **base skin family / palette**; evolution tints + form accents layer on top for the run (cosmetics only — flap/gravity unchanged aside from a tiny wing-animation flourish).
+During a run the bird **evolves every 10 pipes** (`tier = floor(score / 10)`). Shop `equippedBird` stays the **base skin family / palette**; evolution tints + form accents layer on top for the run (cosmetics only — flap/gravity unchanged aside from a tiny wing-animation flourish).
 
 | Tier | Levels | Kind |
 |-----:|--------|------|
