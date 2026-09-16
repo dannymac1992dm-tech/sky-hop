@@ -136,7 +136,7 @@ html, body {
   }
 }
 
-</style>
+  </style>
 </head>
 <body>
   <div id="game-wrap">
@@ -547,7 +547,7 @@ html, body {
   }
 })(typeof window !== "undefined" ? window : globalThis);
 
-</script>
+  </script>
   <script>
 (() => {
   "use strict";
@@ -660,21 +660,88 @@ html, body {
   };
 
   // —— Level bird evolution (every 5 levels) ——
-  // Shop equippedBird = base skin family / palette. During a run, evolution
-  // forms + tints apply on top from current level (tier = floor(level/5)).
-  // Ladder has 10 distinct looks; higher tiers cycle with prestige palette shifts.
+  // Shop equippedBird = base skin for Hatchling (tier 0). From tier 1+ the
+  // evolution ladder supplies a FULL distinct palette so forms are unmistakable.
+  // Ladder has 10 distinct looks; higher tiers cycle with prestige glow shifts.
   // Levels 1–4 → tier 0, 5–9 → tier 1, 10–14 → tier 2, …
   const EVOLUTION_LADDER = [
-    { id: "hatchling",   name: "Hatchling",     accent: "none",     tint: null,           feel: 0 },
-    { id: "fledgling",   name: "Fledgling",     accent: "crest",    tint: "#ffe8a0",      feel: 0.02 },
-    { id: "sky_hopper",  name: "Sky Hopper",    accent: "glow",     tint: "#a8e6ff",      feel: 0.03 },
-    { id: "gale_wing",   name: "Gale Wing",     accent: "streaks",  tint: "#c8fff0",      feel: 0.04 },
-    { id: "storm_rider", name: "Storm Rider",   accent: "electric", tint: "#b0d0ff",      feel: 0.05 },
-    { id: "aurora",      name: "Aurora Flap",   accent: "aurora",   tint: "#ffb0e8",      feel: 0.06 },
-    { id: "nova",        name: "Nova Beak",     accent: "nova",     tint: "#fff0a0",      feel: 0.07 },
-    { id: "eclipse",     name: "Eclipse Crow",  accent: "eclipse",  tint: "#c0a0ff",      feel: 0.08 },
-    { id: "celestial",   name: "Celestial",     accent: "halo",     tint: "#e8f0ff",      feel: 0.09 },
-    { id: "phoenix",     name: "Mythic Phoenix",accent: "phoenix",  tint: "#ff9060",      feel: 0.1 },
+    {
+      id: "hatchling", name: "Hatchling", accent: "none", feel: 0,
+      // palette: null → use shop equipped bird (classic yellow by default)
+      palette: null,
+    },
+    {
+      id: "fledgling", name: "Fledgling", accent: "crest", feel: 0.04,
+      palette: {
+        body0: "#fff6c0", body1: "#ffc107", body2: "#e65100",
+        wing: "#ffb300", wingDark: "#ef6c00", belly: "rgba(255,248,220,0.7)",
+        beak: "#ff6f00", cheek: "rgba(255,160,40,0.55)", glow: "rgba(255,193,7,0.4)",
+      },
+    },
+    {
+      id: "sky_hopper", name: "Sky Hopper", accent: "glow", feel: 0.05,
+      palette: {
+        body0: "#e1f5fe", body1: "#29b6f6", body2: "#01579b",
+        wing: "#4fc3f7", wingDark: "#0277bd", belly: "rgba(200,240,255,0.6)",
+        beak: "#ffb74d", cheek: "rgba(80,180,255,0.45)", glow: "rgba(79,195,247,0.5)",
+      },
+    },
+    {
+      id: "gale_wing", name: "Gale Wing", accent: "streaks", feel: 0.06,
+      palette: {
+        body0: "#e0fff4", body1: "#26a69a", body2: "#004d40",
+        wing: "#80cbc4", wingDark: "#00695c", belly: "rgba(200,255,240,0.55)",
+        beak: "#ffca28", cheek: "rgba(100,220,180,0.4)", glow: "rgba(38,166,154,0.4)",
+      },
+    },
+    {
+      id: "storm_rider", name: "Storm Rider", accent: "electric", feel: 0.07,
+      palette: {
+        body0: "#e8eaf6", body1: "#5c6bc0", body2: "#1a237e",
+        wing: "#7986cb", wingDark: "#303f9f", belly: "rgba(200,210,255,0.5)",
+        beak: "#ffd54f", cheek: "rgba(140,160,255,0.45)", glow: "rgba(100,140,255,0.5)",
+      },
+    },
+    {
+      id: "aurora", name: "Aurora Flap", accent: "aurora", feel: 0.08,
+      palette: {
+        body0: "#ffe0f0", body1: "#ec407a", body2: "#880e4f",
+        wing: "#f48fb1", wingDark: "#ad1457", belly: "rgba(255,200,230,0.55)",
+        beak: "#ff80ab", cheek: "rgba(255,120,180,0.5)", glow: "rgba(236,64,122,0.45)",
+      },
+    },
+    {
+      id: "nova", name: "Nova Beak", accent: "nova", feel: 0.09,
+      palette: {
+        body0: "#fffde7", body1: "#ffee58", body2: "#f9a825",
+        wing: "#fff176", wingDark: "#fbc02d", belly: "rgba(255,255,220,0.7)",
+        beak: "#ff6f00", cheek: "rgba(255,220,80,0.5)", glow: "rgba(255,235,59,0.55)",
+      },
+    },
+    {
+      id: "eclipse", name: "Eclipse Crow", accent: "eclipse", feel: 0.1,
+      palette: {
+        body0: "#b39ddb", body1: "#512da8", body2: "#12005e",
+        wing: "#7e57c2", wingDark: "#311b92", belly: "rgba(200,180,255,0.4)",
+        beak: "#ce93d8", cheek: "rgba(160,120,255,0.45)", glow: "rgba(126,87,194,0.5)",
+      },
+    },
+    {
+      id: "celestial", name: "Celestial", accent: "halo", feel: 0.11,
+      palette: {
+        body0: "#fafafa", body1: "#e0e7ff", body2: "#90a4ae",
+        wing: "#cfd8dc", wingDark: "#78909c", belly: "rgba(255,255,255,0.65)",
+        beak: "#ffd54f", cheek: "rgba(200,220,255,0.45)", glow: "rgba(230,240,255,0.55)",
+      },
+    },
+    {
+      id: "phoenix", name: "Mythic Phoenix", accent: "phoenix", feel: 0.12,
+      palette: {
+        body0: "#ffe0b2", body1: "#ff5722", body2: "#bf360c",
+        wing: "#ff7043", wingDark: "#d84315", belly: "rgba(255,220,180,0.55)",
+        beak: "#ffab00", cheek: "rgba(255,120,40,0.5)", glow: "rgba(255,87,34,0.55)",
+      },
+    },
   ];
   const PRESTIGE_LABELS = ["", "★ ", "◆ ", "✦ ", "✧ "];
   const PRESTIGE_GLOWS = [
@@ -704,8 +771,8 @@ html, body {
       id: base.id,
       name: prefix + base.name,
       accent: base.accent,
-      tint: base.tint,
       feel: base.feel,
+      palette: base.palette,
       glow: PRESTIGE_GLOWS[prestige] || null,
     };
   }
@@ -740,22 +807,43 @@ html, body {
     const baseId = unlocks.equippedBird;
     const base = BIRD_PALETTES[baseId] || BIRD_PALETTES.bird_default;
     const evo = evolutionMeta(lv == null ? level : lv);
-    const t = evo.tier <= 0 ? 0 : Math.min(0.55, 0.22 + evo.feel * 2.2 + evo.prestige * 0.06);
-    const tint = evo.tint;
-    const out = {
-      body0: mixHex(base.body0, tint || base.body0, t * 0.7),
-      body1: mixHex(base.body1, tint || base.body1, t),
-      body2: mixHex(base.body2, tint || base.body2, t * 0.85),
-      wing: mixHex(base.wing, tint || base.wing, t * 0.75),
-      wingDark: base.wingDark,
-      belly: base.belly,
-      beak: mixHex(base.beak, tint || base.beak, t * 0.4),
-      cheek: base.cheek,
-      glow: evo.glow || base.glow,
+    // Tier 0 (Hatchling): shop skin is the body.
+    // Tier >= 1: evolution ladder palette IS the bird — clearly different each form.
+    // Shop may lightly tint beak only; body/wings come entirely from evolution.
+    if (evo.tier <= 0 || !evo.palette) {
+      return {
+        body0: base.body0,
+        body1: base.body1,
+        body2: base.body2,
+        wing: base.wing,
+        wingDark: base.wingDark,
+        belly: base.belly,
+        beak: base.beak,
+        cheek: base.cheek,
+        glow: evo.glow || base.glow,
+        evo: evo,
+        birdId: baseId,
+      };
+    }
+    const p = evo.palette;
+    // Prestige cycles: slight warm/cool shift so repeat forms still feel upgraded
+    const prestShift = evo.prestige > 0
+      ? (evo.prestige === 1 ? "#ffe566" : evo.prestige === 2 ? "#c8e0ff" : evo.prestige === 3 ? "#ffb0e8" : "#90ffe0")
+      : null;
+    const ps = prestShift ? Math.min(0.22, 0.08 + evo.prestige * 0.04) : 0;
+    return {
+      body0: mixHex(p.body0, prestShift || p.body0, ps),
+      body1: mixHex(p.body1, prestShift || p.body1, ps),
+      body2: mixHex(p.body2, prestShift || p.body2, ps * 0.8),
+      wing: mixHex(p.wing, prestShift || p.wing, ps * 0.7),
+      wingDark: p.wingDark,
+      belly: p.belly,
+      beak: mixHex(p.beak, base.beak, 0.12),
+      cheek: p.cheek,
+      glow: evo.glow || p.glow,
       evo: evo,
       birdId: baseId,
     };
-    return out;
   }
 
   let unlocks = loadUnlocks();
@@ -2650,13 +2738,13 @@ html, body {
       ctx.fill();
     }
 
-    // Evolution outer aura (higher forms / prestige)
-    if (evo.accent === "glow" || evo.accent === "halo" || evo.accent === "phoenix" || evo.prestige > 0) {
+    // Evolution outer aura (higher forms / prestige) — stronger so forms read at a glance
+    if (evo.accent === "glow" || evo.accent === "halo" || evo.accent === "phoenix" || evo.accent === "nova" || evo.prestige > 0) {
       ctx.save();
-      ctx.globalAlpha = 0.18 + evo.feel * 0.35 + evo.prestige * 0.05;
-      ctx.fillStyle = pal.glow || "rgba(255,255,255,0.35)";
+      ctx.globalAlpha = 0.28 + evo.feel * 0.45 + evo.prestige * 0.06;
+      ctx.fillStyle = pal.glow || "rgba(255,255,255,0.4)";
       ctx.beginPath();
-      ctx.ellipse(0, 0, 24, 20, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 28, 23, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -2690,87 +2778,128 @@ html, body {
       ctx.fill();
     }
     if (birdId === "bird_night" || evo.accent === "eclipse" || evo.accent === "crest") {
+      const crestBoost = evo.accent === "crest" ? 5 : (evo.accent === "eclipse" ? 3 : 0);
       ctx.fillStyle = pal.wingDark;
       ctx.beginPath();
       ctx.moveTo(-10, -8);
-      ctx.lineTo(-14, -16 - (evo.accent === "crest" ? 2 : 0));
+      ctx.lineTo(-15, -16 - crestBoost);
       ctx.lineTo(-4, -10);
       ctx.fill();
       ctx.beginPath();
       ctx.moveTo(2, -10);
-      ctx.lineTo(0, -16 - (evo.accent === "crest" ? 2 : 0));
+      ctx.lineTo(-1, -17 - crestBoost);
       ctx.lineTo(8, -9);
       ctx.fill();
     }
 
-    // Evolution-only accents (ladder forms)
+    // Evolution-only accents (ladder forms) — kept large so forms are unmistakable
     if (evo.accent === "crest" && birdId !== "bird_night") {
+      ctx.fillStyle = pal.glow || pal.body0;
+      ctx.beginPath();
+      ctx.moveTo(-4, -11);
+      ctx.lineTo(0, -24);
+      ctx.lineTo(5, -12);
+      ctx.fill();
       ctx.fillStyle = pal.body1;
       ctx.beginPath();
-      ctx.moveTo(-2, -12);
-      ctx.lineTo(2, -20);
-      ctx.lineTo(6, -12);
+      ctx.moveTo(1, -12);
+      ctx.lineTo(6, -22);
+      ctx.lineTo(10, -11);
+      ctx.fill();
+      ctx.fillStyle = pal.beak;
+      ctx.beginPath();
+      ctx.moveTo(4, -12);
+      ctx.lineTo(10, -19);
+      ctx.lineTo(12, -10);
       ctx.fill();
     }
     if (evo.accent === "streaks") {
-      ctx.strokeStyle = "rgba(200,255,240,0.7)";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(180,255,230,0.9)";
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(-18, 0);
-      ctx.quadraticCurveTo(-28, -6, -34, 2);
-      ctx.moveTo(-16, 6);
-      ctx.quadraticCurveTo(-26, 4, -32, 10);
+      ctx.moveTo(-18, -2);
+      ctx.quadraticCurveTo(-30, -10, -42, 0);
+      ctx.moveTo(-17, 5);
+      ctx.quadraticCurveTo(-28, 4, -40, 12);
+      ctx.moveTo(-15, 10);
+      ctx.quadraticCurveTo(-24, 14, -34, 18);
       ctx.stroke();
     }
     if (evo.accent === "electric") {
-      ctx.strokeStyle = "rgba(160,200,255,0.85)";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(180,210,255,0.95)";
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.moveTo(-16, -4);
-      ctx.lineTo(-22, -10);
-      ctx.lineTo(-18, -2);
-      ctx.lineTo(-24, 2);
+      ctx.moveTo(-16, -6);
+      ctx.lineTo(-24, -14);
+      ctx.lineTo(-18, -4);
+      ctx.lineTo(-28, 2);
+      ctx.lineTo(-20, 4);
+      ctx.lineTo(-26, 12);
       ctx.stroke();
+      ctx.fillStyle = "rgba(200,230,255,0.85)";
+      ctx.beginPath();
+      ctx.arc(-26, 12, 2.2, 0, Math.PI * 2);
+      ctx.fill();
     }
     if (evo.accent === "aurora") {
-      ctx.strokeStyle = "rgba(255,120,200,0.55)";
+      ctx.strokeStyle = "rgba(255,100,200,0.7)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.ellipse(2, 5, 13, 9, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(60,220,255,0.6)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(2, 5, 11, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(2, 5, 10, 7, 0, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.strokeStyle = "rgba(80,220,255,0.45)";
+      ctx.strokeStyle = "rgba(180,120,255,0.5)";
       ctx.beginPath();
-      ctx.ellipse(2, 5, 9, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(2, 5, 7, 5, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (evo.accent === "nova") {
-      ctx.fillStyle = "#fff6a0";
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + frame * 0.05;
+      ctx.fillStyle = "#fff8c0";
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 + frame * 0.06;
         ctx.beginPath();
-        ctx.arc(18 + Math.cos(a) * 3, 2 + Math.sin(a) * 2, 1.4, 0, Math.PI * 2);
+        ctx.arc(18 + Math.cos(a) * 5, 2 + Math.sin(a) * 3.5, 2, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.fillStyle = "rgba(255,255,200,0.7)";
+      ctx.beginPath();
+      ctx.arc(18, 2, 3.5, 0, Math.PI * 2);
+      ctx.fill();
     }
     if (evo.accent === "halo") {
-      ctx.strokeStyle = "rgba(230,240,255,0.75)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(0, -16, 10, 3.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -18, 14, 4.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(200,220,255,0.55)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, -18, 11, 3, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (evo.accent === "phoenix") {
-      ctx.fillStyle = "rgba(255,100,40,0.55)";
+      ctx.fillStyle = "rgba(255,80,20,0.7)";
       ctx.beginPath();
       ctx.moveTo(-14, 2);
-      ctx.quadraticCurveTo(-28, -8, -36, 4);
-      ctx.quadraticCurveTo(-26, 8, -14, 6);
+      ctx.quadraticCurveTo(-32, -12, -46, 2);
+      ctx.quadraticCurveTo(-30, 10, -14, 8);
       ctx.fill();
-      ctx.fillStyle = "rgba(255,200,60,0.45)";
+      ctx.fillStyle = "rgba(255,180,40,0.65)";
+      ctx.beginPath();
+      ctx.moveTo(-12, 4);
+      ctx.quadraticCurveTo(-28, -2, -40, 10);
+      ctx.quadraticCurveTo(-24, 12, -12, 10);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,240,120,0.55)";
       ctx.beginPath();
       ctx.moveTo(-12, 6);
-      ctx.quadraticCurveTo(-24, 2, -30, 12);
-      ctx.quadraticCurveTo(-20, 10, -12, 8);
+      ctx.quadraticCurveTo(-22, 8, -32, 16);
+      ctx.quadraticCurveTo(-18, 12, -12, 10);
       ctx.fill();
     }
 
@@ -2948,19 +3077,31 @@ html, body {
       ctx.restore();
     }
 
-    // Current evolution form (subtle, top-left — avoids combo/level stack)
+    // Current evolution form (top-left — clearly readable)
     if (state === State.PLAY) {
       const evo = evolutionMeta(level);
+      const label = "Form: " + evo.name;
       ctx.save();
-      ctx.globalAlpha = 0.8;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = "rgba(0,30,50,0.55)";
+      ctx.beginPath();
+      // rounded pill behind name
+      const px = 6, py = 12, pw = tw + 12, ph = 20, r = 6;
+      ctx.moveTo(px + r, py);
+      ctx.arcTo(px + pw, py, px + pw, py + ph, r);
+      ctx.arcTo(px + pw, py + ph, px, py + ph, r);
+      ctx.arcTo(px, py + ph, px, py, r);
+      ctx.arcTo(px, py, px + pw, py, r);
+      ctx.closePath();
+      ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(0,40,60,0.35)";
-      ctx.strokeText(evo.name, 10, 22);
-      ctx.fillStyle = "#e8fff4";
-      ctx.fillText(evo.name, 10, 22);
+      ctx.strokeStyle = "rgba(0,40,60,0.55)";
+      ctx.strokeText(label, 12, 22);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, 12, 22);
       ctx.restore();
     }
 
@@ -3097,10 +3238,16 @@ html, body {
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.fillText(formatLevel(MAX_LEVEL) + " levels — every " + PIPES_PER_LEVEL + " pipes", W / 2, 136);
 
+    // Ready/menu: show starting form + evolution cadence
+    const menuEvo = evolutionMeta(1);
+    ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,255,220,0.92)";
+    ctx.fillText("Form: " + menuEvo.name + "  ·  evolves every 5 levels", W / 2, 158);
+
     if (extrasOn) {
       ctx.fillStyle = "rgba(255,255,200,0.7)";
       ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
-      ctx.fillText("Extras on — trees, critters & hunters!", W / 2, 158);
+      ctx.fillText("Extras on — trees, critters & hunters!", W / 2, 178);
     }
 
     drawShopButton(W / 2 - 70, PLAY_H - 88);
@@ -3635,6 +3782,6 @@ html, body {
   requestAnimationFrame(loop);
 })();
 
-</script>
+  </script>
 </body>
 </html>
