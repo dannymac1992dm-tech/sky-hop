@@ -108,11 +108,11 @@
     },
   };
 
-  // —— Level bird evolution (every 10 levels) ——
+  // —— Level bird evolution (every 5 levels) ——
   // Shop equippedBird = base skin family / palette. During a run, evolution
-  // forms + tints apply on top from current level (tier = floor(level/10)).
+  // forms + tints apply on top from current level (tier = floor(level/5)).
   // Ladder has 10 distinct looks; higher tiers cycle with prestige palette shifts.
-  // Levels 1–9 → tier 0, 10–19 → tier 1, … (no 1000 unique arts for 10k levels).
+  // Levels 1–4 → tier 0, 5–9 → tier 1, 10–14 → tier 2, …
   const EVOLUTION_LADDER = [
     { id: "hatchling",   name: "Hatchling",     accent: "none",     tint: null,           feel: 0 },
     { id: "fledgling",   name: "Fledgling",     accent: "crest",    tint: "#ffe8a0",      feel: 0.02 },
@@ -136,7 +136,7 @@
 
   function evolutionTier(lv) {
     const L = Math.max(1, Math.min(MAX_LEVEL, lv | 0));
-    return Math.floor(L / 10);
+    return Math.floor(L / 5);
   }
 
   function evolutionMeta(lv) {
@@ -928,7 +928,7 @@
       levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
-      // Bird evolution every 10 levels (tier = floor(level/10))
+      // Bird evolution every 5 levels (tier = floor(level/5))
       const prevTier = evolutionTier(prev);
       const nextTier = evolutionTier(level);
       if (nextTier > prevTier) {
