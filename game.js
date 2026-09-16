@@ -1008,28 +1008,28 @@
     scoreMult = Math.min(2.5, 1 + Math.floor(cleanStreak / 3) * 0.25);
   }
 
-  function onScoreChanged() {
+  function onScoreChanged(prevScore) {
     const prev = level;
     level = levelFromScore(score);
     applyDifficulty();
+    // Bird evolution every 10 pipes — independent of level-ups
+    const before = prevScore == null ? Math.max(0, score - 1) : prevScore;
+    const prevTier = evolutionTier(before);
+    const nextTier = evolutionTier(score);
+    if (nextTier > prevTier) {
+      const evo = evolutionMeta(score);
+      evolveFlash = 1.25;
+      evolveFlashText = "Bird evolved! " + evo.name;
+      sfxMilestone();
+      const pal = activeBirdPalette(score);
+      spawnParticles(bird.x, bird.y, 18, pal.body1 || "#ffe566");
+      spawnParticles(bird.x, bird.y - 6, 10, pal.glow ? "#fff6a0" : (pal.body0 || "#fff"));
+    }
     if (level > prev) {
       levelFlash = 1;
       levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
-      // Bird evolution every 10 pipes (tier = floor(score/10))
-      const prevTier = evolutionTier(score - 1); // score already incremented
-      const nextTier = evolutionTier(score);
-      if (nextTier > prevTier) {
-        const evo = evolutionMeta(score);
-        evolveFlash = 1.25;
-        evolveFlashText = "Bird evolved! " + evo.name;
-        sfxMilestone();
-        const pal = activeBirdPalette(level);
-        spawnParticles(bird.x, bird.y, 18, pal.body1 || "#ffe566");
-        spawnParticles(bird.x, bird.y - 6, 10, pal.glow ? "#fff6a0" : (pal.body0 || "#fff"));
-      }
-      // Milestone celebrations
       if (level % 1000 === 0) {
         milestoneFlash = 1.2;
         milestoneFlashText = "✦ " + formatLevel(level) + " MILESTONE ✦";
@@ -1038,8 +1038,7 @@
         milestoneFlash = 1.1;
         milestoneFlashText = "★ Level " + formatLevel(level) + "! ★";
         sfxMilestone();
-      } else if (level % 10 === 0 && nextTier <= prevTier) {
-        // Non-evolution decade milestones only (evolution already celebrated)
+      } else if (level % 10 === 0) {
         milestoneFlash = 1;
         milestoneFlashText = "Level " + formatLevel(level);
         sfxLevel();
@@ -1121,9 +1120,10 @@
     if (scoreMult >= 2) add += 1;
     if (scoreMult >= 2.5) add += 1;
     if (nearMiss) add += 0; // sparkle only — no streak bonus
+    const prevScore = score;
     score += add;
     scorePop = 1;
-    onScoreChanged();
+    onScoreChanged(prevScore);
     sfxScore();
   }
 
@@ -1354,7 +1354,7 @@
   }
 
   function trailColor() {
-    const pal = activeBirdPalette(level);
+    const pal = activeBirdPalette(score);
     return pal.body1 || "#ffe566";
   }
 
