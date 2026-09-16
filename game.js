@@ -313,6 +313,8 @@
   let slowmoUsedThisRun = false;
   let hintFlashFrames = 0;
   let hintPipeId = null;
+  // Gap-flash / Hint UI only from this level onward (keeps early game clean)
+  const HINT_MIN_LEVEL = 20;
   let trailTick = 0;
 
   function loadUnlocks() {
@@ -492,6 +494,7 @@
 
   function triggerHintFlash() {
     if (!isOwned("feat_hint")) return;
+    if (level < HINT_MIN_LEVEL) return; // no early-game pipe lights
     // Flash the nearest upcoming unscored pipe gap
     let best = null;
     for (const p of pipes) {
@@ -1187,10 +1190,8 @@
     sfxFlap();
     bird.vy = FLAP;
     unlockTrophy(1);
-    // Auto gap-flash once at run start if owned
-    if (isOwned("feat_hint")) {
-      setTimeout(function () { if (state === State.PLAY) triggerHintFlash(); }, 400);
-    }
+    hintFlashFrames = 0;
+    hintPipeId = null;
     notifyAdsState();
   }
 
@@ -1815,10 +1816,6 @@
       }
     }
 
-    // Periodic gap hint while owned (every ~4s if no active flash)
-    if (isOwned("feat_hint") && hintFlashFrames <= 0 && frame % 240 === 0) {
-      triggerHintFlash();
-    }
 
     if (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H) {
       gameOver();
@@ -1833,7 +1830,6 @@
     if (nextSpawn <= 0) {
       spawnPipe();
       nextSpawn = spawnEvery;
-      if (isOwned("feat_hint") && hintFlashFrames <= 0) triggerHintFlash();
     }
 
     const pipeStep = pipeSpeed * timeScale;
@@ -3099,7 +3095,7 @@
     if (isOwned("skill_glide") && !glideUsedThisRun) buttons.push({ action: "glide", label: "Glide", hot: "1" });
     if (isOwned("skill_double") && !doubleUsedThisRun) buttons.push({ action: "double", label: "Boost", hot: "2" });
     if (isOwned("feat_slowmo") && !slowmoUsedThisRun) buttons.push({ action: "slowmo", label: "Slow", hot: "3" });
-    if (isOwned("feat_hint")) buttons.push({ action: "hint", label: "Hint", hot: "4" });
+    if (isOwned("feat_hint") && level >= HINT_MIN_LEVEL) buttons.push({ action: "hint", label: "Hint", hot: "4" });
     if (!buttons.length) return;
     const bw = 54;
     const bh = 28;
