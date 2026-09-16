@@ -40,6 +40,8 @@
   let levelFlashText = "";
   let milestoneFlash = 0;
   let milestoneFlashText = "";
+  let evolveFlash = 0;
+  let evolveFlashText = "";
   let trophyFlash = 0;
   let trophyFlashText = "";
   let trophyScroll = 0;
@@ -105,6 +107,105 @@
       beak: "#ffd700", cheek: "rgba(200,150,255,0.4)", glow: "rgba(157,78,221,0.4)",
     },
   };
+
+  // —— Level bird evolution (every 10 levels) ——
+  // Shop equippedBird = base skin family / palette. During a run, evolution
+  // forms + tints apply on top from current level (tier = floor(level/10)).
+  // Ladder has 10 distinct looks; higher tiers cycle with prestige palette shifts.
+  // Levels 1–9 → tier 0, 10–19 → tier 1, … (no 1000 unique arts for 10k levels).
+  const EVOLUTION_LADDER = [
+    { id: "hatchling",   name: "Hatchling",     accent: "none",     tint: null,           feel: 0 },
+    { id: "fledgling",   name: "Fledgling",     accent: "crest",    tint: "#ffe8a0",      feel: 0.02 },
+    { id: "sky_hopper",  name: "Sky Hopper",    accent: "glow",     tint: "#a8e6ff",      feel: 0.03 },
+    { id: "gale_wing",   name: "Gale Wing",     accent: "streaks",  tint: "#c8fff0",      feel: 0.04 },
+    { id: "storm_rider", name: "Storm Rider",   accent: "electric", tint: "#b0d0ff",      feel: 0.05 },
+    { id: "aurora",      name: "Aurora Flap",   accent: "aurora",   tint: "#ffb0e8",      feel: 0.06 },
+    { id: "nova",        name: "Nova Beak",     accent: "nova",     tint: "#fff0a0",      feel: 0.07 },
+    { id: "eclipse",     name: "Eclipse Crow",  accent: "eclipse",  tint: "#c0a0ff",      feel: 0.08 },
+    { id: "celestial",   name: "Celestial",     accent: "halo",     tint: "#e8f0ff",      feel: 0.09 },
+    { id: "phoenix",     name: "Mythic Phoenix",accent: "phoenix",  tint: "#ff9060",      feel: 0.1 },
+  ];
+  const PRESTIGE_LABELS = ["", "★ ", "◆ ", "✦ ", "✧ "];
+  const PRESTIGE_GLOWS = [
+    null,
+    "rgba(255,215,0,0.4)",
+    "rgba(200,220,255,0.45)",
+    "rgba(255,140,220,0.4)",
+    "rgba(120,255,200,0.4)",
+  ];
+
+  function evolutionTier(lv) {
+    const L = Math.max(1, Math.min(MAX_LEVEL, lv | 0));
+    return Math.floor(L / 10);
+  }
+
+  function evolutionMeta(lv) {
+    const tier = evolutionTier(lv);
+    const n = EVOLUTION_LADDER.length;
+    const idx = tier % n;
+    const prestige = Math.min(PRESTIGE_LABELS.length - 1, Math.floor(tier / n));
+    const base = EVOLUTION_LADDER[idx];
+    const prefix = PRESTIGE_LABELS[prestige] || "";
+    return {
+      tier: tier,
+      idx: idx,
+      prestige: prestige,
+      id: base.id,
+      name: prefix + base.name,
+      accent: base.accent,
+      tint: base.tint,
+      feel: base.feel,
+      glow: PRESTIGE_GLOWS[prestige] || null,
+    };
+  }
+
+  function mixHex(a, b, t) {
+    if (!a || !b || t <= 0) return a || b;
+    if (t >= 1) return b;
+    function parse(h) {
+      if (!h || h[0] !== "#" || (h.length !== 7 && h.length !== 4)) return null;
+      if (h.length === 4) {
+        return [
+          parseInt(h[1] + h[1], 16),
+          parseInt(h[2] + h[2], 16),
+          parseInt(h[3] + h[3], 16),
+        ];
+      }
+      return [
+        parseInt(h.slice(1, 3), 16),
+        parseInt(h.slice(3, 5), 16),
+        parseInt(h.slice(5, 7), 16),
+      ];
+    }
+    const A = parse(a), B = parse(b);
+    if (!A || !B) return a;
+    const r = Math.round(A[0] + (B[0] - A[0]) * t);
+    const g = Math.round(A[1] + (B[1] - A[1]) * t);
+    const bl = Math.round(A[2] + (B[2] - A[2]) * t);
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+  }
+
+  function activeBirdPalette(lv) {
+    const baseId = unlocks.equippedBird;
+    const base = BIRD_PALETTES[baseId] || BIRD_PALETTES.bird_default;
+    const evo = evolutionMeta(lv == null ? level : lv);
+    const t = evo.tier <= 0 ? 0 : Math.min(0.55, 0.22 + evo.feel * 2.2 + evo.prestige * 0.06);
+    const tint = evo.tint;
+    const out = {
+      body0: mixHex(base.body0, tint || base.body0, t * 0.7),
+      body1: mixHex(base.body1, tint || base.body1, t),
+      body2: mixHex(base.body2, tint || base.body2, t * 0.85),
+      wing: mixHex(base.wing, tint || base.wing, t * 0.75),
+      wingDark: base.wingDark,
+      belly: base.belly,
+      beak: mixHex(base.beak, tint || base.beak, t * 0.4),
+      cheek: base.cheek,
+      glow: evo.glow || base.glow,
+      evo: evo,
+      birdId: baseId,
+    };
+    return out;
+  }
 
   let unlocks = loadUnlocks();
   let unlockProgress = loadUnlockProgress();
@@ -827,6 +928,18 @@
       levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
+      // Bird evolution every 10 levels (tier = floor(level/10))
+      const prevTier = evolutionTier(prev);
+      const nextTier = evolutionTier(level);
+      if (nextTier > prevTier) {
+        const evo = evolutionMeta(level);
+        evolveFlash = 1.25;
+        evolveFlashText = "Bird evolved! " + evo.name;
+        sfxMilestone();
+        const pal = activeBirdPalette(level);
+        spawnParticles(bird.x, bird.y, 18, pal.body1 || "#ffe566");
+        spawnParticles(bird.x, bird.y - 6, 10, pal.glow ? "#fff6a0" : (pal.body0 || "#fff"));
+      }
       // Milestone celebrations
       if (level % 1000 === 0) {
         milestoneFlash = 1.2;
@@ -836,7 +949,8 @@
         milestoneFlash = 1.1;
         milestoneFlashText = "★ Level " + formatLevel(level) + "! ★";
         sfxMilestone();
-      } else if (level % 10 === 0) {
+      } else if (level % 10 === 0 && nextTier <= prevTier) {
+        // Non-evolution decade milestones only (evolution already celebrated)
         milestoneFlash = 1;
         milestoneFlashText = "Level " + formatLevel(level);
         sfxLevel();
@@ -954,6 +1068,8 @@
     levelFlashText = "";
     milestoneFlash = 0;
     milestoneFlashText = "";
+    evolveFlash = 0;
+    evolveFlashText = "";
     trophyFlash = 0;
     trophyFlashText = "";
     newRecordFlash = 0;
@@ -1149,7 +1265,7 @@
   }
 
   function trailColor() {
-    const pal = BIRD_PALETTES[unlocks.equippedBird] || BIRD_PALETTES.bird_default;
+    const pal = activeBirdPalette(level);
     return pal.body1 || "#ffe566";
   }
 
@@ -1554,6 +1670,7 @@
     if (scorePop > 0) scorePop *= 0.9;
     if (levelFlash > 0) levelFlash *= 0.94;
     if (milestoneFlash > 0) milestoneFlash *= 0.955;
+    if (evolveFlash > 0) evolveFlash *= 0.95;
     if (trophyFlash > 0) trophyFlash *= 0.96;
     if (newRecordFlash > 0) newRecordFlash *= 0.97;
     if (multPop > 0) multPop *= 0.92;
@@ -1962,9 +2079,13 @@
     ctx.translate(bird.x, bird.y);
     ctx.rotate(bird.rot);
 
-    const wingAngle = -0.5 + bird.wing * 1.1;
-    const pal = BIRD_PALETTES[unlocks.equippedBird] || BIRD_PALETTES.bird_default;
-    const birdId = unlocks.equippedBird;
+    // Evolution feel: slightly snappier wing visual at higher tiers (cosmetic only)
+    const showLv = (state === State.PLAY || state === State.OVER) ? level : 1;
+    const pal = activeBirdPalette(showLv);
+    const evo = pal.evo;
+    const birdId = pal.birdId;
+    const wingBoost = 1 + (evo.feel || 0) * 0.35;
+    const wingAngle = -0.5 + bird.wing * 1.1 * wingBoost;
 
     ctx.fillStyle = "rgba(0,0,0,0.12)";
     ctx.beginPath();
@@ -1974,8 +2095,19 @@
     if (pal.glow) {
       ctx.fillStyle = pal.glow;
       ctx.beginPath();
-      ctx.ellipse(0, 0, 22, 18, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 22 + evo.prestige, 18 + evo.prestige * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    // Evolution outer aura (higher forms / prestige)
+    if (evo.accent === "glow" || evo.accent === "halo" || evo.accent === "phoenix" || evo.prestige > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.18 + evo.feel * 0.35 + evo.prestige * 0.05;
+      ctx.fillStyle = pal.glow || "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 24, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     const body = ctx.createRadialGradient(-4, -4, 2, 0, 0, 18);
@@ -1987,7 +2119,7 @@
     ctx.ellipse(0, 0, 17, 14, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Skin accents
+    // Shop skin accents (base family)
     if (birdId === "bird_neon") {
       ctx.strokeStyle = "#00e5ff";
       ctx.lineWidth = 2;
@@ -1995,9 +2127,8 @@
       ctx.ellipse(0, 0, 17, 14, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
-    if (birdId === "bird_royal") {
-      // tiny crown
-      ctx.fillStyle = "#ffd700";
+    if (birdId === "bird_royal" || evo.accent === "eclipse") {
+      ctx.fillStyle = birdId === "bird_royal" ? "#ffd700" : (evo.prestige ? "#ffe566" : "#c0a0ff");
       ctx.beginPath();
       ctx.moveTo(-6, -12);
       ctx.lineTo(-3, -18);
@@ -2007,18 +2138,88 @@
       ctx.closePath();
       ctx.fill();
     }
-    if (birdId === "bird_night") {
-      // ear tufts
+    if (birdId === "bird_night" || evo.accent === "eclipse" || evo.accent === "crest") {
       ctx.fillStyle = pal.wingDark;
       ctx.beginPath();
       ctx.moveTo(-10, -8);
-      ctx.lineTo(-14, -16);
+      ctx.lineTo(-14, -16 - (evo.accent === "crest" ? 2 : 0));
       ctx.lineTo(-4, -10);
       ctx.fill();
       ctx.beginPath();
       ctx.moveTo(2, -10);
-      ctx.lineTo(0, -16);
+      ctx.lineTo(0, -16 - (evo.accent === "crest" ? 2 : 0));
       ctx.lineTo(8, -9);
+      ctx.fill();
+    }
+
+    // Evolution-only accents (ladder forms)
+    if (evo.accent === "crest" && birdId !== "bird_night") {
+      ctx.fillStyle = pal.body1;
+      ctx.beginPath();
+      ctx.moveTo(-2, -12);
+      ctx.lineTo(2, -20);
+      ctx.lineTo(6, -12);
+      ctx.fill();
+    }
+    if (evo.accent === "streaks") {
+      ctx.strokeStyle = "rgba(200,255,240,0.7)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.quadraticCurveTo(-28, -6, -34, 2);
+      ctx.moveTo(-16, 6);
+      ctx.quadraticCurveTo(-26, 4, -32, 10);
+      ctx.stroke();
+    }
+    if (evo.accent === "electric") {
+      ctx.strokeStyle = "rgba(160,200,255,0.85)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-16, -4);
+      ctx.lineTo(-22, -10);
+      ctx.lineTo(-18, -2);
+      ctx.lineTo(-24, 2);
+      ctx.stroke();
+    }
+    if (evo.accent === "aurora") {
+      ctx.strokeStyle = "rgba(255,120,200,0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(2, 5, 11, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(80,220,255,0.45)";
+      ctx.beginPath();
+      ctx.ellipse(2, 5, 9, 6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (evo.accent === "nova") {
+      ctx.fillStyle = "#fff6a0";
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + frame * 0.05;
+        ctx.beginPath();
+        ctx.arc(18 + Math.cos(a) * 3, 2 + Math.sin(a) * 2, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (evo.accent === "halo") {
+      ctx.strokeStyle = "rgba(230,240,255,0.75)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, -16, 10, 3.5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (evo.accent === "phoenix") {
+      ctx.fillStyle = "rgba(255,100,40,0.55)";
+      ctx.beginPath();
+      ctx.moveTo(-14, 2);
+      ctx.quadraticCurveTo(-28, -8, -36, 4);
+      ctx.quadraticCurveTo(-26, 8, -14, 6);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,200,60,0.45)";
+      ctx.beginPath();
+      ctx.moveTo(-12, 6);
+      ctx.quadraticCurveTo(-24, 2, -30, 12);
+      ctx.quadraticCurveTo(-20, 10, -12, 8);
       ctx.fill();
     }
 
@@ -2032,7 +2233,7 @@
     ctx.rotate(wingAngle);
     ctx.fillStyle = pal.wing;
     ctx.beginPath();
-    ctx.ellipse(0, 0, 12, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 12 + evo.feel * 4, 7 + evo.feel * 2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = pal.wingDark;
     ctx.beginPath();
@@ -2040,7 +2241,7 @@
     ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = birdId === "bird_night" ? "#e8f0ff" : "#fff";
+    ctx.fillStyle = birdId === "bird_night" || evo.accent === "eclipse" ? "#e8f0ff" : "#fff";
     ctx.beginPath();
     ctx.arc(8, -4, 5.5, 0, Math.PI * 2);
     ctx.fill();
@@ -2056,7 +2257,7 @@
     ctx.fillStyle = pal.beak;
     ctx.beginPath();
     ctx.moveTo(14, -1);
-    ctx.lineTo(24, 2);
+    ctx.lineTo(24 + (evo.accent === "nova" ? 2 : 0), 2);
     ctx.lineTo(14, 5);
     ctx.closePath();
     ctx.fill();
@@ -2071,6 +2272,15 @@
     ctx.beginPath();
     ctx.ellipse(4, 3, 4, 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Prestige rim
+    if (evo.prestige > 0) {
+      ctx.strokeStyle = evo.glow || "rgba(255,215,0,0.55)";
+      ctx.lineWidth = 1.5 + evo.prestige * 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 18, 15, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Shield bubble
     if (state === State.PLAY && shieldCharges > 0) {
@@ -2169,6 +2379,37 @@
       ctx.strokeText(milestoneFlashText, W / 2, y);
       ctx.fillStyle = "#ff9cf0";
       ctx.fillText(milestoneFlashText, W / 2, y);
+      ctx.restore();
+    }
+
+    if (evolveFlash > 0.05 && state === State.PLAY) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, evolveFlash);
+      const y = 168 + (1 - Math.min(1, evolveFlash)) * 14;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 17px 'Segoe UI', system-ui, sans-serif";
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(20,60,40,0.45)";
+      ctx.strokeText(evolveFlashText, W / 2, y);
+      ctx.fillStyle = "#7dffb0";
+      ctx.fillText(evolveFlashText, W / 2, y);
+      ctx.restore();
+    }
+
+    // Current evolution form (subtle, top-left — avoids combo/level stack)
+    if (state === State.PLAY) {
+      const evo = evolutionMeta(level);
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,40,60,0.35)";
+      ctx.strokeText(evo.name, 10, 22);
+      ctx.fillStyle = "#e8fff4";
+      ctx.fillText(evo.name, 10, 22);
       ctx.restore();
     }
 
