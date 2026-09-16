@@ -18,9 +18,11 @@
   const MUTE_KEY = "skyhop_mute";
   const EXTRAS_KEY = "skyhop_extras";
   const TROPHY_KEY = "skyhop_trophies";
+  const UNLOCKS_KEY = "skyhop_unlocks";
+  const UNLOCK_PROGRESS_KEY = "skyhop_unlock_progress";
 
   // —— State ——
-  const State = { START: 0, PLAY: 1, OVER: 2, TROPHIES: 3 };
+  const State = { START: 0, PLAY: 1, OVER: 2, TROPHIES: 3, SHOP: 4 };
   let state = State.START;
   let prevMenuState = State.START;
   let score = 0;
@@ -58,6 +60,271 @@
   let continueUsedThisRun = false;
   let invulnFrames = 0;
   let continueBusy = false;
+
+  // —— Freemium unlock catalog v1 ——
+  const CATALOG = [
+    { id: "bird_default", name: "Classic", kind: "bird", watches: 0 },
+    { id: "bird_gold", name: "Golden Hop", kind: "bird", watches: 1 },
+    { id: "bird_night", name: "Night Owl", kind: "bird", watches: 1 },
+    { id: "bird_neon", name: "Neon Flap", kind: "bird", watches: 2 },
+    { id: "bird_royal", name: "Royal Crow", kind: "bird", watches: 3 },
+    { id: "feat_trail", name: "Spark trail", kind: "feat", watches: 1 },
+    { id: "feat_hint", name: "Gap flash", kind: "feat", watches: 2, freeLevel: 20 },
+    { id: "feat_slowmo", name: "Slow-mo", kind: "feat", watches: 2 },
+    { id: "skill_glide", name: "Glide", kind: "skill", watches: 2, freeLevel: 40 },
+    { id: "skill_double", name: "Double flap", kind: "skill", watches: 2, freeLevel: 60 },
+    { id: "skill_shield", name: "Feather shield", kind: "skill", watches: 3, freeLevel: 80 },
+  ];
+  const CATALOG_BY_ID = {};
+  for (const it of CATALOG) CATALOG_BY_ID[it.id] = it;
+
+  const BIRD_PALETTES = {
+    bird_default: {
+      body0: "#fff5a0", body1: "#ffd54a", body2: "#f0a820",
+      wing: "#ffb020", wingDark: "#e89010", belly: "rgba(255,255,255,0.55)",
+      beak: "#ff6b2d", cheek: "rgba(255,100,100,0.35)", glow: null,
+    },
+    bird_gold: {
+      body0: "#fff8d0", body1: "#ffd700", body2: "#c9a000",
+      wing: "#ffe566", wingDark: "#d4af37", belly: "rgba(255,250,200,0.65)",
+      beak: "#ff8c00", cheek: "rgba(255,200,80,0.45)", glow: "rgba(255,215,0,0.35)",
+    },
+    bird_night: {
+      body0: "#6a7a9a", body1: "#3a4560", body2: "#1e2435",
+      wing: "#4a5570", wingDark: "#2a3045", belly: "rgba(160,180,220,0.35)",
+      beak: "#c0c8d8", cheek: "rgba(100,140,200,0.35)", glow: "rgba(80,120,200,0.25)",
+    },
+    bird_neon: {
+      body0: "#e0ff90", body1: "#39ff14", body2: "#00c853",
+      wing: "#00e5ff", wingDark: "#00bcd4", belly: "rgba(200,255,255,0.45)",
+      beak: "#ff00e5", cheek: "rgba(255,0,200,0.4)", glow: "rgba(57,255,20,0.45)",
+    },
+    bird_royal: {
+      body0: "#d0b0ff", body1: "#7b2cbf", body2: "#3c096c",
+      wing: "#9d4edd", wingDark: "#5a189a", belly: "rgba(240,220,255,0.4)",
+      beak: "#ffd700", cheek: "rgba(200,150,255,0.4)", glow: "rgba(157,78,221,0.4)",
+    },
+  };
+
+  let unlocks = loadUnlocks();
+  let unlockProgress = loadUnlockProgress();
+  let shopScroll = 0;
+  let shopDragY = null;
+  let shopDragScroll = 0;
+  let shopBusy = false;
+  let shopToast = 0;
+  let shopToastText = "";
+  // Per-run perk state (reset in startPlay)
+  let glideFlapsLeft = 0;
+  let glideUsedThisRun = false;
+  let doubleUsedThisRun = false;
+  let shieldCharges = 0;
+  let slowmoFrames = 0;
+  let slowmoUsedThisRun = false;
+  let hintFlashFrames = 0;
+  let hintPipeId = null;
+  let trailTick = 0;
+
+  function loadUnlocks() {
+    try {
+      const raw = localStorage.getItem(UNLOCKS_KEY);
+      if (!raw) {
+        return { owned: ["bird_default"], equippedBird: "bird_default", equippedTrail: false };
+      }
+      const data = JSON.parse(raw);
+      const owned = Array.isArray(data.owned) ? data.owned.map(String) : [];
+      if (owned.indexOf("bird_default") < 0) owned.unshift("bird_default");
+      let bird = typeof data.equippedBird === "string" ? data.equippedBird : "bird_default";
+      if (owned.indexOf(bird) < 0) bird = "bird_default";
+      return {
+        owned: owned,
+        equippedBird: bird,
+        equippedTrail: !!data.equippedTrail,
+      };
+    } catch (_) {
+      return { owned: ["bird_default"], equippedBird: "bird_default", equippedTrail: false };
+    }
+  }
+
+  function saveUnlocks() {
+    try {
+      localStorage.setItem(UNLOCKS_KEY, JSON.stringify({
+        owned: unlocks.owned,
+        equippedBird: unlocks.equippedBird,
+        equippedTrail: !!unlocks.equippedTrail,
+      }));
+    } catch (_) {}
+  }
+
+  function loadUnlockProgress() {
+    try {
+      const raw = localStorage.getItem(UNLOCK_PROGRESS_KEY);
+      if (!raw) return {};
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+      const out = {};
+      for (const k of Object.keys(data)) {
+        const n = parseInt(data[k], 10);
+        if (Number.isFinite(n) && n > 0) out[k] = n;
+      }
+      return out;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveUnlockProgress() {
+    try {
+      localStorage.setItem(UNLOCK_PROGRESS_KEY, JSON.stringify(unlockProgress));
+    } catch (_) {}
+  }
+
+  function peakLevel() {
+    return Math.max(bestLevel | 0, highestUnlocked | 0);
+  }
+
+  function isOwned(id) {
+    if (!id) return false;
+    if (unlocks.owned.indexOf(id) >= 0) return true;
+    const item = CATALOG_BY_ID[id];
+    if (item && item.freeLevel && peakLevel() >= item.freeLevel) return true;
+    return false;
+  }
+
+  function watchesNeeded(id) {
+    const item = CATALOG_BY_ID[id];
+    return item ? (item.watches | 0) : 0;
+  }
+
+  function progressFor(id) {
+    return unlockProgress[id] | 0;
+  }
+
+  function grantOwned(id) {
+    if (!id || unlocks.owned.indexOf(id) >= 0) return;
+    unlocks.owned.push(id);
+    saveUnlocks();
+  }
+
+  function applyUnlockWatch(id) {
+    const item = CATALOG_BY_ID[id];
+    if (!item || item.watches <= 0) return false;
+    if (unlocks.owned.indexOf(id) >= 0) return false;
+    const need = item.watches;
+    const cur = (unlockProgress[id] | 0) + 1;
+    unlockProgress[id] = cur;
+    saveUnlockProgress();
+    if (cur >= need) {
+      grantOwned(id);
+      delete unlockProgress[id];
+      saveUnlockProgress();
+      shopToast = 1.4;
+      shopToastText = "Unlocked: " + item.name;
+      return true;
+    }
+    shopToast = 1.1;
+    shopToastText = item.name + " " + cur + "/" + need;
+    return false;
+  }
+
+  function equipBird(id) {
+    if (!isOwned(id) || !CATALOG_BY_ID[id] || CATALOG_BY_ID[id].kind !== "bird") return;
+    unlocks.equippedBird = id;
+    saveUnlocks();
+  }
+
+  function toggleTrailEquip() {
+    if (!isOwned("feat_trail")) return;
+    unlocks.equippedTrail = !unlocks.equippedTrail;
+    saveUnlocks();
+  }
+
+  function adsApi() {
+    return typeof window !== "undefined" ? window.SkyHopAds : null;
+  }
+
+  function canNativeUnlockAd() {
+    const ads = adsApi();
+    return !!(ads && typeof ads.canOfferUnlock === "function" && ads.canOfferUnlock());
+  }
+
+  function isBrowserPlay() {
+    const ads = adsApi();
+    if (!ads) return true;
+    try {
+      return !(typeof ads.isNative === "function" && ads.isNative());
+    } catch (_) {
+      return true;
+    }
+  }
+
+  function resetRunPerks() {
+    glideFlapsLeft = 0;
+    glideUsedThisRun = false;
+    doubleUsedThisRun = false;
+    shieldCharges = isOwned("skill_shield") ? 1 : 0;
+    slowmoFrames = 0;
+    slowmoUsedThisRun = false;
+    hintFlashFrames = 0;
+    hintPipeId = null;
+    trailTick = 0;
+  }
+
+  function tryActivateGlide() {
+    if (state !== State.PLAY || glideUsedThisRun || !isOwned("skill_glide")) return false;
+    glideUsedThisRun = true;
+    glideFlapsLeft = 3;
+    shopToast = 0.9;
+    shopToastText = "Glide!";
+    return true;
+  }
+
+  function tryActivateDouble() {
+    if (state !== State.PLAY || doubleUsedThisRun || !isOwned("skill_double")) return false;
+    doubleUsedThisRun = true;
+    bird.vy = FLAP * 1.35;
+    bird.wing = 1;
+    spawnParticles(bird.x, bird.y, 10, "#7dffb0");
+    sfxFlap();
+    shopToast = 0.9;
+    shopToastText = "Double flap!";
+    return true;
+  }
+
+  function tryActivateSlowmo() {
+    if (state !== State.PLAY || slowmoUsedThisRun || !isOwned("feat_slowmo")) return false;
+    slowmoUsedThisRun = true;
+    slowmoFrames = 90; // ~1.5s at 60fps wall, applied as time scale
+    shopToast = 0.9;
+    shopToastText = "Slow-mo!";
+    return true;
+  }
+
+  function triggerHintFlash() {
+    if (!isOwned("feat_hint")) return;
+    // Flash the nearest upcoming unscored pipe gap
+    let best = null;
+    for (const p of pipes) {
+      if (p.scored) continue;
+      if (p.x + p.w < bird.x - 10) continue;
+      if (!best || p.x < best.x) best = p;
+    }
+    if (!best) return;
+    hintPipeId = best;
+    hintFlashFrames = 55;
+  }
+
+  function absorbHitWithShield() {
+    if (shieldCharges <= 0) return false;
+    shieldCharges = 0;
+    invulnFrames = Math.max(invulnFrames, 60);
+    flash = 0.55;
+    spawnParticles(bird.x, bird.y, 16, "#c8e0ff");
+    shopToast = 1;
+    shopToastText = "Shield!";
+    sfxNearMiss();
+    return true;
+  }
 
   // —— Levels & trophies (scalable to 10,000) ——
   const MAX_LEVEL = 10000;
@@ -635,6 +902,8 @@
       spawnParticles(bird.x + 10, bird.y, 12, "#fff6a0");
       spawnParticles(bird.x, bird.y - 8, 8, "#ffd54a");
       sfxNearMiss();
+      // Soft assist: auto slow-mo once per run on near-miss if owned
+      if (isOwned("feat_slowmo") && !slowmoUsedThisRun) tryActivateSlowmo();
     } else {
       cleanStreak++;
       if (cleanStreak > 0 && cleanStreak % 3 === 0) {
@@ -706,18 +975,24 @@
     continueUsedThisRun = false;
     continueBusy = false;
     invulnFrames = 0;
+    resetRunPerks();
     state = State.PLAY;
     ensureAudio();
     startMusicLoop(true);
     sfxFlap();
     bird.vy = FLAP;
     unlockTrophy(1);
+    // Auto gap-flash once at run start if owned
+    if (isOwned("feat_hint")) {
+      setTimeout(function () { if (state === State.PLAY) triggerHintFlash(); }, 400);
+    }
     notifyAdsState();
   }
 
   function gameOver() {
     if (state !== State.PLAY) return;
     if (invulnFrames > 0) return;
+    if (absorbHitWithShield()) return;
     state = State.OVER;
     overTimer = 0;
     flash = 1;
@@ -749,7 +1024,7 @@
   }
 
   function notifyAdsState() {
-    const ads = typeof window !== "undefined" ? window.SkyHopAds : null;
+    const ads = adsApi();
     if (!ads) return;
     try {
       if (state === State.PLAY) ads.onPlaying();
@@ -779,12 +1054,16 @@
 
   async function requestRewardedContinue() {
     if (continueUsedThisRun || continueBusy || state !== State.OVER) return;
-    const ads = window.SkyHopAds;
-    if (!ads || typeof ads.showRewardedContinue !== "function") return;
+    const ads = adsApi();
+    if (!ads) return;
+    const show = typeof ads.showRewarded === "function"
+      ? function () { return ads.showRewarded("continue"); }
+      : ads.showRewardedContinue;
+    if (typeof show !== "function") return;
     if (typeof ads.canOfferContinue === "function" && !ads.canOfferContinue()) return;
     continueBusy = true;
     try {
-      const ok = await ads.showRewardedContinue();
+      const ok = await show();
       if (ok) continuePlay();
       else continueBusy = false;
     } catch (_) {
@@ -792,8 +1071,43 @@
     }
   }
 
+  async function requestUnlockWatch(itemId) {
+    if (shopBusy || state !== State.SHOP) return;
+    const item = CATALOG_BY_ID[itemId];
+    if (!item || item.watches <= 0) return;
+    if (unlocks.owned.indexOf(itemId) >= 0) return;
+    shopBusy = true;
+    try {
+      const ads = adsApi();
+      let ok = false;
+      if (ads && typeof ads.showRewarded === "function" && canNativeUnlockAd()) {
+        ok = await ads.showRewarded("unlock");
+      } else if (isBrowserPlay()) {
+        // Discreet web playtest path — no AdMob in browser
+        ok = true;
+      }
+      if (ok) applyUnlockWatch(itemId);
+    } catch (_) {
+    } finally {
+      shopBusy = false;
+    }
+  }
+
+  function openShop() {
+    prevMenuState = state === State.SHOP || state === State.TROPHIES ? prevMenuState : state;
+    state = State.SHOP;
+    shopScroll = 0;
+    notifyAdsState();
+  }
+
+  function closeShop() {
+    state = prevMenuState === State.PLAY ? State.START : prevMenuState;
+    if (state === State.PLAY || state === State.TROPHIES || state === State.SHOP) state = State.START;
+    notifyAdsState();
+  }
+
   function openTrophies() {
-    prevMenuState = state === State.TROPHIES ? prevMenuState : state;
+    prevMenuState = (state === State.TROPHIES || state === State.SHOP) ? prevMenuState : state;
     state = State.TROPHIES;
     shelfLevels = buildShelfLevels();
     trophyScroll = 0;
@@ -802,16 +1116,19 @@
 
   function closeTrophies() {
     state = prevMenuState === State.PLAY ? State.START : prevMenuState;
-    if (state === State.PLAY) state = State.START;
+    if (state === State.PLAY || state === State.SHOP || state === State.TROPHIES) state = State.START;
     notifyAdsState();
   }
 
   // Hit-test regions for UI buttons drawn on canvas
-  const uiButtons = { trophies: null, back: null, close: null, continue: null };
+  const uiButtons = {
+    trophies: null, shop: null, back: null, close: null, continue: null,
+    rows: null, skills: null,
+  };
 
   function flap() {
     ensureAudio();
-    if (state === State.TROPHIES) return;
+    if (state === State.TROPHIES || state === State.SHOP) return;
     if (state === State.START) {
       startPlay();
       return;
@@ -824,7 +1141,16 @@
       bird.vy = FLAP;
       bird.wing = 1;
       sfxFlap();
+      if (glideFlapsLeft > 0) glideFlapsLeft--;
+      if (unlocks.equippedTrail && isOwned("feat_trail")) {
+        spawnParticles(bird.x - 8, bird.y, 6, trailColor());
+      }
     }
+  }
+
+  function trailColor() {
+    const pal = BIRD_PALETTES[unlocks.equippedBird] || BIRD_PALETTES.bird_default;
+    return pal.body1 || "#ffe566";
   }
 
   function canvasToLocal(e) {
@@ -1232,13 +1558,17 @@
     if (newRecordFlash > 0) newRecordFlash *= 0.97;
     if (multPop > 0) multPop *= 0.92;
     if (nearMissFlash > 0) nearMissFlash *= 0.9;
+    if (shopToast > 0) shopToast *= 0.96;
     if (bird.wing > 0) bird.wing *= 0.85;
     if (invulnFrames > 0) invulnFrames--;
+    if (hintFlashFrames > 0) hintFlashFrames--;
+    if (slowmoFrames > 0) slowmoFrames--;
     updateParticles();
 
-    if (state === State.TROPHIES) return;
+    if (state === State.TROPHIES || state === State.SHOP) return;
 
-    const scrollMul = state === State.PLAY ? 1 : state === State.START ? 0.35 : 0.15;
+    const timeScale = (state === State.PLAY && slowmoFrames > 0) ? 0.45 : 1;
+    const scrollMul = (state === State.PLAY ? 1 : state === State.START ? 0.35 : 0.15) * timeScale;
     groundX = (groundX - pipeSpeed * scrollMul) % 48;
     cloudX = (cloudX - pipeSpeed * 0.25 * scrollMul) % (W + 200);
     hillX = (hillX - pipeSpeed * 0.5 * scrollMul) % (W + 120);
@@ -1264,9 +1594,25 @@
     }
 
     // PLAY
-    bird.vy = Math.min(bird.vy + GRAVITY, MAX_FALL);
-    bird.y += bird.vy;
+    let g = GRAVITY;
+    if (glideFlapsLeft > 0) g = GRAVITY * 0.42;
+    if (slowmoFrames > 0) g *= timeScale;
+    bird.vy = Math.min(bird.vy + g, MAX_FALL);
+    bird.y += bird.vy * (slowmoFrames > 0 ? timeScale : 1);
     bird.rot = Math.max(-0.55, Math.min(1.15, bird.vy * 0.08));
+
+    // Spark trail while flying with trail equipped
+    if (unlocks.equippedTrail && isOwned("feat_trail")) {
+      trailTick++;
+      if (trailTick % 3 === 0) {
+        spawnParticles(bird.x - 10, bird.y + (Math.random() * 6 - 3), 2, trailColor());
+      }
+    }
+
+    // Periodic gap hint while owned (every ~4s if no active flash)
+    if (isOwned("feat_hint") && hintFlashFrames <= 0 && frame % 240 === 0) {
+      triggerHintFlash();
+    }
 
     if (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H) {
       gameOver();
@@ -1274,14 +1620,20 @@
     }
 
     nextSpawn--;
+    // Slow spawn countdown roughly with time scale
+    if (slowmoFrames > 0 && frame % 2 === 0) {
+      /* already decremented once */
+    }
     if (nextSpawn <= 0) {
       spawnPipe();
       nextSpawn = spawnEvery;
+      if (isOwned("feat_hint") && hintFlashFrames <= 0) triggerHintFlash();
     }
 
+    const pipeStep = pipeSpeed * timeScale;
     for (let i = pipes.length - 1; i >= 0; i--) {
       const p = pipes[i];
-      p.x -= pipeSpeed;
+      p.x -= pipeStep;
 
       if (!p.scored && p.x + p.w < bird.x) {
         p.scored = true;
@@ -1611,22 +1963,66 @@
     ctx.rotate(bird.rot);
 
     const wingAngle = -0.5 + bird.wing * 1.1;
+    const pal = BIRD_PALETTES[unlocks.equippedBird] || BIRD_PALETTES.bird_default;
+    const birdId = unlocks.equippedBird;
 
     ctx.fillStyle = "rgba(0,0,0,0.12)";
     ctx.beginPath();
     ctx.ellipse(2, 18, 14, 5, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    if (pal.glow) {
+      ctx.fillStyle = pal.glow;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 22, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     const body = ctx.createRadialGradient(-4, -4, 2, 0, 0, 18);
-    body.addColorStop(0, "#fff5a0");
-    body.addColorStop(0.5, "#ffd54a");
-    body.addColorStop(1, "#f0a820");
+    body.addColorStop(0, pal.body0);
+    body.addColorStop(0.5, pal.body1);
+    body.addColorStop(1, pal.body2);
     ctx.fillStyle = body;
     ctx.beginPath();
     ctx.ellipse(0, 0, 17, 14, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    // Skin accents
+    if (birdId === "bird_neon") {
+      ctx.strokeStyle = "#00e5ff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 17, 14, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (birdId === "bird_royal") {
+      // tiny crown
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.moveTo(-6, -12);
+      ctx.lineTo(-3, -18);
+      ctx.lineTo(0, -13);
+      ctx.lineTo(3, -18);
+      ctx.lineTo(6, -12);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (birdId === "bird_night") {
+      // ear tufts
+      ctx.fillStyle = pal.wingDark;
+      ctx.beginPath();
+      ctx.moveTo(-10, -8);
+      ctx.lineTo(-14, -16);
+      ctx.lineTo(-4, -10);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(2, -10);
+      ctx.lineTo(0, -16);
+      ctx.lineTo(8, -9);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = pal.belly;
     ctx.beginPath();
     ctx.ellipse(2, 5, 10, 7, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1634,21 +2030,21 @@
     ctx.save();
     ctx.translate(-2, 2);
     ctx.rotate(wingAngle);
-    ctx.fillStyle = "#ffb020";
+    ctx.fillStyle = pal.wing;
     ctx.beginPath();
     ctx.ellipse(0, 0, 12, 7, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#e89010";
+    ctx.fillStyle = pal.wingDark;
     ctx.beginPath();
     ctx.ellipse(-2, 0, 7, 4, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = birdId === "bird_night" ? "#e8f0ff" : "#fff";
     ctx.beginPath();
     ctx.arc(8, -4, 5.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#222";
+    ctx.fillStyle = birdId === "bird_neon" ? "#111" : "#222";
     ctx.beginPath();
     ctx.arc(9.5, -4, 2.8, 0, Math.PI * 2);
     ctx.fill();
@@ -1657,7 +2053,7 @@
     ctx.arc(10.5, -5.2, 1.1, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = "#ff6b2d";
+    ctx.fillStyle = pal.beak;
     ctx.beginPath();
     ctx.moveTo(14, -1);
     ctx.lineTo(24, 2);
@@ -1671,10 +2067,19 @@
     ctx.lineTo(22, 2);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(255,100,100,0.35)";
+    ctx.fillStyle = pal.cheek;
     ctx.beginPath();
     ctx.ellipse(4, 3, 4, 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
+
+    // Shield bubble
+    if (state === State.PLAY && shieldCharges > 0) {
+      ctx.strokeStyle = "rgba(180,220,255,0.7)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -1860,8 +2265,29 @@
     uiButtons.trophies = { x: bx, y: by, w: bw, h: bh };
   }
 
+  function drawShopButton(cx, cy) {
+    const bw = 120;
+    const bh = 34;
+    const bx = cx - bw / 2;
+    const by = cy - bh / 2;
+    ctx.fillStyle = "rgba(80,160,255,0.92)";
+    roundRect(bx, by, bw, bh, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.45)";
+    ctx.lineWidth = 2;
+    roundRect(bx, by, bw, bh, 10);
+    ctx.stroke();
+    ctx.fillStyle = "#062040";
+    ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🛒 Shop", cx, cy);
+    uiButtons.shop = { x: bx, y: by, w: bw, h: bh };
+  }
+
   function drawStart() {
     uiButtons.trophies = null;
+    uiButtons.shop = null;
     uiButtons.continue = null;
     ctx.textAlign = "center";
     ctx.fillStyle = "#fff";
@@ -1885,7 +2311,8 @@
       ctx.fillText("Extras on — trees, critters & hunters!", W / 2, 158);
     }
 
-    drawTrophyButton(W / 2, PLAY_H - 78);
+    drawShopButton(W / 2 - 70, PLAY_H - 88);
+    drawTrophyButton(W / 2 + 70, PLAY_H - 88);
 
     const pulse = 0.55 + Math.sin(frame * 0.12) * 0.45;
     ctx.globalAlpha = pulse;
@@ -1907,6 +2334,7 @@
 
   function drawOver() {
     uiButtons.trophies = null;
+    uiButtons.shop = null;
     uiButtons.continue = null;
     const lines = [
       "Level  " + formatLevel(level),
@@ -1958,7 +2386,8 @@
       y += 28;
     }
 
-    drawTrophyButton(W / 2, y + 8);
+    drawShopButton(W / 2 - 70, y + 8);
+    drawTrophyButton(W / 2 + 70, y + 8);
   }
 
   function drawTrophyIcon(x, y, lv, unlockedFlag) {
@@ -2090,6 +2519,237 @@
     ctx.fillText("Milestones · landmarks · peak  ·  Esc", W / 2, H - 10);
   }
 
+
+  function drawShopScreen() {
+    ctx.fillStyle = "rgba(10,20,35,0.92)";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 26px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Shop", W / 2, 42);
+    ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillStyle = "rgba(180,210,255,0.9)";
+    const browser = isBrowserPlay();
+    ctx.fillText(
+      browser ? "Preview · Simulate unlock (web) for playtesting" : "Watch ads to unlock · Free Retry always",
+      W / 2, 66
+    );
+
+    const bw = 80;
+    const bh = 32;
+    const bx = 16;
+    const by = 20;
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    roundRect(bx, by, bw, bh, 8);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("← Back", bx + bw / 2, by + bh / 2);
+    uiButtons.back = { x: bx, y: by, w: bw, h: bh };
+    uiButtons.rows = [];
+
+    const listTop = 88;
+    const listBot = H - 28;
+    const rowH = 58;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(12, listTop, W - 24, listBot - listTop);
+    ctx.clip();
+
+    const startIdx = Math.floor(shopScroll / rowH);
+    const endIdx = Math.min(CATALOG.length, startIdx + Math.ceil((listBot - listTop) / rowH) + 1);
+
+    for (let i = startIdx; i < endIdx; i++) {
+      const item = CATALOG[i];
+      const y = listTop + i * rowH - shopScroll;
+      const owned = isOwned(item.id);
+      const inOwnedList = unlocks.owned.indexOf(item.id) >= 0;
+      const freeByLevel = !!(item.freeLevel && peakLevel() >= item.freeLevel);
+      const prog = progressFor(item.id);
+      const need = item.watches;
+      const equipped = item.kind === "bird" && unlocks.equippedBird === item.id;
+      const trailOn = item.id === "feat_trail" && unlocks.equippedTrail;
+
+      ctx.fillStyle = owned
+        ? (equipped || trailOn ? "rgba(80,180,120,0.22)" : "rgba(255,255,255,0.1)")
+        : "rgba(255,255,255,0.05)";
+      roundRect(20, y + 4, W - 40, rowH - 8, 10);
+      ctx.fill();
+
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillStyle = owned ? "#e8f4ff" : "rgba(180,190,200,0.7)";
+      let title = item.name;
+      if (item.kind === "bird") title = "🐦 " + title;
+      else if (item.kind === "feat") title = "✨ " + title;
+      else title = "⚡ " + title;
+      ctx.fillText(title, 32, y + rowH / 2 - 10);
+
+      ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+      let sub;
+      if (owned) {
+        if (item.kind === "bird" && equipped) sub = "Owned · Equipped";
+        else if (item.id === "feat_trail" && trailOn) sub = "Owned · Trail ON";
+        else if (item.id === "feat_trail") sub = "Owned · tap to toggle";
+        else if (freeByLevel && !inOwnedList) sub = "Owned · free @ L" + item.freeLevel;
+        else sub = "Owned";
+      } else {
+        sub = "Locked · " + prog + "/" + need + " ads";
+        if (item.freeLevel) sub += " · free @ L" + item.freeLevel;
+      }
+      ctx.fillStyle = owned ? "rgba(200,230,255,0.65)" : "rgba(160,170,180,0.55)";
+      ctx.fillText(sub, 32, y + rowH / 2 + 10);
+
+      // Action chip on the right
+      const chipW = 96;
+      const chipH = 28;
+      const chipX = W - 28 - chipW;
+      const chipY = y + (rowH - chipH) / 2;
+      let action = null;
+      let label = "";
+      let chipFill = "rgba(255,255,255,0.12)";
+      let chipText = "#fff";
+
+      if (owned && item.kind === "bird") {
+        if (!equipped) {
+          action = "equip";
+          label = "Equip";
+          chipFill = "rgba(255,200,60,0.9)";
+          chipText = "#3a2800";
+        } else {
+          label = "Equipped";
+          chipFill = "rgba(80,160,100,0.7)";
+        }
+      } else if (owned && item.id === "feat_trail") {
+        action = "toggleTrail";
+        label = trailOn ? "Trail ON" : "Enable";
+        chipFill = trailOn ? "rgba(80,160,100,0.85)" : "rgba(80,140,220,0.85)";
+      } else if (owned) {
+        label = "Ready";
+        chipFill = "rgba(80,160,100,0.55)";
+      } else if (need > 0) {
+        if (browser) {
+          action = "simulate";
+          label = "Simulate";
+          chipFill = "rgba(120,100,200,0.85)";
+        } else if (canNativeUnlockAd()) {
+          action = "watch";
+          label = "Watch " + prog + "/" + need;
+          chipFill = "rgba(40,120,200,0.92)";
+        } else {
+          label = "App only";
+          chipFill = "rgba(80,80,90,0.55)";
+        }
+      }
+
+      if (label) {
+        ctx.fillStyle = chipFill;
+        roundRect(chipX, chipY, chipW, chipH, 8);
+        ctx.fill();
+        ctx.fillStyle = chipText;
+        ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, chipX + chipW / 2, chipY + chipH / 2);
+      }
+
+      if (action) {
+        uiButtons.rows.push({
+          x: chipX, y: chipY, w: chipW, h: chipH,
+          itemId: item.id, action: action,
+        });
+      }
+    }
+    ctx.restore();
+
+    if (shopToast > 0.05) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, shopToast);
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      roundRect(W / 2 - 120, H - 52, 240, 28, 8);
+      ctx.fill();
+      ctx.fillStyle = "#ffe566";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(shopToastText, W / 2, H - 38);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Birds · features · skills  ·  Esc", W / 2, H - 10);
+  }
+
+  function drawGapHint() {
+    if (hintFlashFrames <= 0 || !hintPipeId) return;
+    const p = hintPipeId;
+    if (pipes.indexOf(p) < 0) return;
+    const top = p.gapY - p.gap / 2;
+    const bot = p.gapY + p.gap / 2;
+    const a = Math.min(1, hintFlashFrames / 40) * 0.55;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = "#fff6a0";
+    ctx.fillRect(p.x - 4, top, p.w + 8, bot - top);
+    ctx.strokeStyle = "#ffe566";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(p.x - 4, top, p.w + 8, bot - top);
+    ctx.restore();
+  }
+
+  function drawSkillHud() {
+    uiButtons.skills = [];
+    if (state !== State.PLAY) return;
+    const buttons = [];
+    if (isOwned("skill_glide") && !glideUsedThisRun) buttons.push({ action: "glide", label: "Glide", hot: "1" });
+    if (isOwned("skill_double") && !doubleUsedThisRun) buttons.push({ action: "double", label: "Boost", hot: "2" });
+    if (isOwned("feat_slowmo") && !slowmoUsedThisRun) buttons.push({ action: "slowmo", label: "Slow", hot: "3" });
+    if (isOwned("feat_hint")) buttons.push({ action: "hint", label: "Hint", hot: "4" });
+    if (!buttons.length) return;
+    const bw = 54;
+    const bh = 28;
+    const gap = 6;
+    const totalW = buttons.length * bw + (buttons.length - 1) * gap;
+    let x = (W - totalW) / 2;
+    const y = H - GROUND_H - 36;
+    for (const b of buttons) {
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      roundRect(x, y, bw, bh, 8);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 1;
+      roundRect(x, y, bw, bh, 8);
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(b.label, x + bw / 2, y + bh / 2);
+      uiButtons.skills.push({ x: x, y: y, w: bw, h: bh, action: b.action });
+      x += bw + gap;
+    }
+    if (slowmoFrames > 0) {
+      ctx.fillStyle = "rgba(100,180,255,0.15)";
+      ctx.fillRect(0, 0, W, H);
+    }
+    if (shopToast > 0.05 && state === State.PLAY) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, shopToast);
+      ctx.fillStyle = "#ffe566";
+      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(shopToastText, W / 2, PLAY_H - 56);
+      ctx.restore();
+    }
+  }
+
+
   function drawFlash() {
     if (flash < 0.02) return;
     ctx.fillStyle = `rgba(255,255,255,${flash * 0.55})`;
@@ -2141,18 +2801,26 @@
       return;
     }
 
+    if (state === State.SHOP) {
+      drawSky();
+      drawClouds();
+      drawHills();
+      drawGround();
+      drawShopScreen();
+      requestAnimationFrame(loop);
+      return;
+    }
+
     drawSky();
     drawClouds();
     drawHills();
     drawWorldExtras("bg");
 
     for (const p of pipes) drawPipe(p);
+    drawGapHint();
 
     drawWorldExtras("fg");
     drawGround();
-
-    // Foreground trees after ground base? Keep trunks on playfield
-    // (trees already drawn in fg layer above ground strip — OK for canopy look)
 
     if (state === State.START) {
       drawBird();
@@ -2160,6 +2828,7 @@
     } else {
       drawBird();
       drawScoreHUD();
+      drawSkillHud();
       if (state === State.OVER) drawOver();
     }
 

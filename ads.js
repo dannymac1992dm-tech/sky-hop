@@ -3,15 +3,17 @@
  *
  * Plain browser / Safari play link: all exports no-op safely.
  * Native (Capacitor Android): initializes AdMob + UMP (best-effort),
- * shows banners on menu / game-over, hides during play, optional rewarded continue.
+ * shows banners on menu / game-over, hides during play, optional rewarded
+ * continue + shop unlock.
  *
  * Test ad units only until live console IDs exist. Do not invent live IDs.
  *
  * Placeholders for production (replace test IDs when shipping):
- *   [BANNER_AD_UNIT_ID]   — banner (menu + game-over)
- *   [REWARDED_AD_UNIT_ID] — rewarded continue
- *   [INTERSTITIAL_AD_UNIT_ID] — Phase C (unused here)
- *   [ADMOB_ANDROID_APP_ID] — AndroidManifest / strings.xml (native App ID)
+ *   [BANNER_AD_UNIT_ID]            — banner (menu + game-over)
+ *   [REWARDED_AD_UNIT_ID]          — rewarded continue
+ *   [REWARDED_UNLOCK_AD_UNIT_ID]   — rewarded shop unlock (separate unit)
+ *   [INTERSTITIAL_AD_UNIT_ID]      — Phase C (unused here)
+ *   [ADMOB_ANDROID_APP_ID]         — AndroidManifest / strings.xml
  *
  * Plugin: @capacitor-community/admob ^8 (pinned in sky-hop-app).
  * UMP API: requestConsentInfo → showConsentForm when status REQUIRED
@@ -33,10 +35,20 @@
   // const LIVE = {
   //   BANNER: "[BANNER_AD_UNIT_ID]",
   //   REWARDED: "[REWARDED_AD_UNIT_ID]",
+  //   REWARDED_UNLOCK: "[REWARDED_UNLOCK_AD_UNIT_ID]",
   // };
+
+  /** Rewarded continue — [REWARDED_AD_UNIT_ID]; test ID until live. */
+  const REWARDED_CONTINUE_AD_UNIT_ID = TEST.REWARDED_ANDROID;
+  /**
+   * Rewarded shop unlock — [REWARDED_UNLOCK_AD_UNIT_ID].
+   * Same Google test numeric ID for now; keep a DISTINCT constant so live swap is one line.
+   */
+  const REWARDED_UNLOCK_AD_UNIT_ID = TEST.REWARDED_ANDROID;
 
   const BANNER_PAD_CSS = "--ad-banner-pad";
   const BANNER_FALLBACK_PX = 60;
+  const AD_STATS_KEY = "skyhop_ad_stats";
 
   let ready = false;
   let initPromise = null;
@@ -87,6 +99,33 @@
     try {
       const v = Math.max(0, Math.round(px || 0));
       document.documentElement.style.setProperty(BANNER_PAD_CSS, v + "px");
+    } catch (_) {}
+  }
+
+  function bumpAdStats(kind) {
+    // Optional local counters only — not revenue.
+    try {
+      let raw = null;
+      try {
+        raw = localStorage.getItem(AD_STATS_KEY);
+      } catch (_) {
+        return;
+      }
+      let stats = { watched: 0, rewarded: 0, lastAt: 0 };
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            stats.watched = parseInt(parsed.watched, 10) || 0;
+            stats.rewarded = parseInt(parsed.rewarded, 10) || 0;
+            stats.lastAt = parseInt(parsed.lastAt, 10) || 0;
+          }
+        } catch (_) {}
+      }
+      if (kind === "watch") stats.watched += 1;
+      if (kind === "reward") stats.rewarded += 1;
+      stats.lastAt = Date.now();
+      localStorage.setItem(AD_STATS_KEY, JSON.stringify(stats));
     } catch (_) {}
   }
 
@@ -156,8 +195,8 @@
       await attachBannerSizeListener(AdMob);
       ready = true;
       log("ready");
-      // Prefetch rewarded for game-over continue
-      prefetchRewarded();
+      // Prefetch rewarded for game-over continue (default purpose)
+      prefetchRewarded("continue");
       return true;
     })();
     return initPromise;
@@ -168,8 +207,10 @@
     return TEST.BANNER_ANDROID;
   }
 
-  function rewardedAdId() {
-    return TEST.REWARDED_ANDROID;
+  /** Resolve rewarded unit by purpose. Unlock uses distinct constant. */
+  function rewardedAdId(purpose) {
+    if (purpose === "unlock") return REWARDED_UNLOCK_AD_UNIT_ID;
+    return REWARDED_CONTINUE_AD_UNIT_ID;
   }
 
   async function showBanner() {
@@ -221,18 +262,19 @@
     setBannerPad(0);
   }
 
-  async function prefetchRewarded() {
+  async function prefetchRewarded(purpose) {
+    const p = purpose === "unlock" ? "unlock" : "continue";
     if (!isNative() || !canRequestAds || preparingReward || rewardedReady) return;
     const AdMob = getAdMob();
     if (!AdMob) return;
     preparingReward = true;
     try {
       await AdMob.prepareRewardVideoAd({
-        adId: rewardedAdId(),
+        adId: rewardedAdId(p),
         isTesting: true,
       });
       rewardedReady = true;
-      log("rewarded prefetched");
+      log("rewarded prefetched", p);
     } catch (e) {
       rewardedReady = false;
       warn("prepareRewardVideoAd failed", e);
@@ -242,34 +284,44 @@
   }
 
   /**
-   * Show rewarded video. Resolves true only if the user earned the reward.
-   * No click incentives — reward only for completing the rewarded video.
+   * Show rewarded video for a purpose.
+   * @param {"continue"|"unlock"} purpose
+   * @returns {Promise<boolean>} true only if the user earned the reward.
    */
-  async function showRewardedContinue() {
+  async function showRewarded(purpose) {
+    const p = purpose === "unlock" ? "unlock" : "continue";
     if (!isNative()) return false;
     await init();
     if (!canRequestAds) return false;
     const AdMob = getAdMob();
     if (!AdMob) return false;
     try {
+      bumpAdStats("watch");
       if (!rewardedReady) {
         await AdMob.prepareRewardVideoAd({
-          adId: rewardedAdId(),
+          adId: rewardedAdId(p),
           isTesting: true,
         });
         rewardedReady = true;
       }
       const reward = await AdMob.showRewardVideoAd();
       rewardedReady = false;
-      // Prefetch next for a later run (one continue per reward already consumed by game)
-      prefetchRewarded();
-      return !!(reward && (reward.amount != null || reward.type != null));
+      const earned = !!(reward && (reward.amount != null || reward.type != null));
+      if (earned) bumpAdStats("reward");
+      // Prefetch next (same purpose family is fine with shared test unit)
+      prefetchRewarded(p);
+      return earned;
     } catch (e) {
       rewardedReady = false;
       warn("showRewardVideoAd failed", e);
-      prefetchRewarded();
+      prefetchRewarded(p);
       return false;
     }
+  }
+
+  /** @deprecated Prefer showRewarded("continue") — kept for older call sites. */
+  async function showRewardedContinue() {
+    return showRewarded("continue");
   }
 
   function applyScreen(screen) {
@@ -280,9 +332,9 @@
       if (screen === "playing") {
         hideBanner();
       } else {
-        // menu + gameover (+ trophies treated as menu by game.js)
+        // menu + gameover (+ trophies/shop treated as menu by game.js)
         showBanner();
-        if (screen === "gameover") prefetchRewarded();
+        if (screen === "gameover") prefetchRewarded("continue");
       }
     });
   }
@@ -292,7 +344,7 @@
     isNative: isNative,
     /** Kick off SDK + consent (safe to call multiple times). */
     init: init,
-    /** game.js → start / trophies / non-play menus */
+    /** game.js → start / trophies / shop / non-play menus */
     onMenu: function () {
       applyScreen("menu");
     },
@@ -308,8 +360,21 @@
     canOfferContinue: function () {
       return isNative() && canRequestAds && ready;
     },
-    /** Load+show rewarded; true only after earned reward. */
+    /** Whether a rewarded unlock can be offered (native + ads allowed). */
+    canOfferUnlock: function () {
+      return isNative() && canRequestAds && ready;
+    },
+    /**
+     * Load+show rewarded for purpose; true only after earned reward.
+     * @param {"continue"|"unlock"} purpose
+     */
+    showRewarded: showRewarded,
+    /** Load+show rewarded continue; true only after earned reward. */
     showRewardedContinue: showRewardedContinue,
+    /** Distinct unlock unit id (test until live). */
+    REWARDED_UNLOCK_AD_UNIT_ID: REWARDED_UNLOCK_AD_UNIT_ID,
+    /** Continue unit id (test until live). */
+    REWARDED_CONTINUE_AD_UNIT_ID: REWARDED_CONTINUE_AD_UNIT_ID,
     /** Constants for docs / debugging (test IDs). */
     TEST_IDS: TEST,
     getScreen: function () {
