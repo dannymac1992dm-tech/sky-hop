@@ -62,6 +62,7 @@
   let continueUsedThisRun = false;
   let invulnFrames = 0;
   let continueBusy = false;
+  let ignoreInputFrames = 0; // post-continue: ignore taps so ad click-through doesn't flap/retry
 
   // —— Freemium unlock catalog v1 ——
   const CATALOG = [
@@ -1183,6 +1184,7 @@
     continueUsedThisRun = false;
     continueBusy = false;
     invulnFrames = 0;
+    ignoreInputFrames = 0;
     resetRunPerks();
     state = State.PLAY;
     ensureAudio();
@@ -1244,6 +1246,14 @@
     if (state !== State.OVER) return;
     continueUsedThisRun = true;
     continueBusy = false;
+    // Keep score/level/pipes progress — only clear pipes that would kill on resume
+    // (overlap bird or sit within ~1.5 screens ahead). Do NOT resetGame/startPlay.
+    const clearUntil = bird.x + W * 1.5;
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      if (pipes[i].x < clearUntil) pipes.splice(i, 1);
+    }
+    // Brief spawn delay so a new pipe doesn't appear on top of the bird
+    nextSpawn = Math.max(nextSpawn, Math.floor(spawnEvery * 0.75) || 40);
     state = State.PLAY;
     overTimer = 0;
     flash = 0;
@@ -1252,6 +1262,7 @@
     bird.rot = 0;
     bird.wing = 1;
     invulnFrames = 90;
+    ignoreInputFrames = 25; // ~0.4s — absorb post-ad click-through
     ensureAudio();
     startMusicLoop(true);
     sfxFlap();
@@ -1334,12 +1345,16 @@
 
   function flap() {
     ensureAudio();
+    // While rewarded continue is showing / just closed, never treat taps as retry/flap
+    if (ignoreInputFrames > 0) return;
     if (state === State.TROPHIES || state === State.SHOP) return;
     if (state === State.START) {
       startPlay();
       return;
     }
     if (state === State.OVER) {
+      // Stray tap during/after ad must NOT call startPlay (that resets score/pipes)
+      if (continueBusy) return;
       if (overTimer > 18) startPlay();
       return;
     }
@@ -1413,6 +1428,8 @@
         requestRewardedContinue();
         return;
       }
+      // During rewarded ad / continueBusy, ignore canvas taps (don't restart run)
+      if (state === State.OVER && continueBusy) return;
       if (hitBtn(pt, uiButtons.trophies)) {
         openTrophies();
         return;
@@ -1768,6 +1785,7 @@
     if (shopToast > 0) shopToast *= 0.96;
     if (bird.wing > 0) bird.wing *= 0.85;
     if (invulnFrames > 0) invulnFrames--;
+    if (ignoreInputFrames > 0) ignoreInputFrames--;
     if (hintFlashFrames > 0) hintFlashFrames--;
     if (slowmoFrames > 0) slowmoFrames--;
     updateParticles();
