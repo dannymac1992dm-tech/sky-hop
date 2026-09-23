@@ -66,6 +66,7 @@
   let continueUsedThisRun = false;
   let invulnFrames = 0;
   let continueBusy = false;
+  let continueSnapshot = null; // mid-run snapshot taken before rewarded continue ad
   let ignoreInputFrames = 0; // post-continue: ignore taps so ad click-through doesn't flap/retry
   // Retention / juice
   let screenShake = 0;
@@ -1562,6 +1563,7 @@
     }
     continueUsedThisRun = false;
     continueBusy = false;
+    continueSnapshot = null;
     invulnFrames = 0;
     ignoreInputFrames = 0;
     offerSafeStart = false;
@@ -1590,6 +1592,9 @@
     overTimer = 0;
     flash = 1;
     screenShake = 1;
+    // Leave PLAY: clear skill toast so "Glide!" etc. cannot stick on OVER/menu
+    shopToast = 0;
+    shopToastText = "";
     softenMusic();
     sfxHit();
     haptic("crash");
@@ -1639,9 +1644,71 @@
     } catch (_) {}
   }
 
+  function cloneEntities(arr) {
+    const out = [];
+    for (let i = 0; i < arr.length; i++) out.push(Object.assign({}, arr[i]));
+    return out;
+  }
+
+  /** Snapshot mid-run state before a continue ad so resume can restore if corrupted. */
+  function takeContinueSnapshot() {
+    continueSnapshot = {
+      score: score,
+      level: level,
+      pipes: cloneEntities(pipes),
+      hunters: cloneEntities(hunters),
+      animals: cloneEntities(animals),
+      projectiles: cloneEntities(projectiles),
+      bird: { x: bird.x, y: bird.y, vy: bird.vy, rot: bird.rot, wing: bird.wing },
+      continueUsedThisRun: continueUsedThisRun,
+      nextSpawn: nextSpawn,
+      pipeGap: pipeGap,
+      pipeSpeed: pipeSpeed,
+      spawnEvery: spawnEvery,
+      gapMargin: gapMargin,
+    };
+  }
+
+  function restoreContinueSnapshot() {
+    const snap = continueSnapshot;
+    if (!snap) return false;
+    score = snap.score;
+    level = snap.level;
+    pipes.length = 0;
+    for (let i = 0; i < snap.pipes.length; i++) pipes.push(Object.assign({}, snap.pipes[i]));
+    hunters.length = 0;
+    for (let i = 0; i < snap.hunters.length; i++) hunters.push(Object.assign({}, snap.hunters[i]));
+    animals.length = 0;
+    for (let i = 0; i < snap.animals.length; i++) animals.push(Object.assign({}, snap.animals[i]));
+    projectiles.length = 0;
+    for (let i = 0; i < snap.projectiles.length; i++) projectiles.push(Object.assign({}, snap.projectiles[i]));
+    bird.x = snap.bird.x;
+    bird.y = snap.bird.y;
+    bird.vy = snap.bird.vy;
+    bird.rot = snap.bird.rot;
+    bird.wing = snap.bird.wing;
+    nextSpawn = snap.nextSpawn;
+    pipeGap = snap.pipeGap;
+    pipeSpeed = snap.pipeSpeed;
+    spawnEvery = snap.spawnEvery;
+    gapMargin = snap.gapMargin;
+    return true;
+  }
+
   /** Resume mid-run after a completed rewarded video (one continue per run). */
   function continuePlay() {
     if (state !== State.OVER) return;
+    // Never call startPlay/resetGame here — that would wipe score/level.
+    const snap = continueSnapshot;
+    const corrupted = !snap || score !== snap.score || level !== snap.level;
+    if (corrupted && snap) {
+      restoreContinueSnapshot();
+    } else if (snap) {
+      // Keep live score/level; still restore pipes/hazards if arrays were wiped
+      if (pipes.length === 0 && snap.pipes.length > 0) {
+        restoreContinueSnapshot();
+      }
+    }
     continueUsedThisRun = true;
     continueBusy = false;
     // Keep score/level/pipes progress — only clear pipes that would kill on resume
@@ -1666,13 +1733,17 @@
     overTimer = 0;
     flash = 0;
     almostLine = "";
+    offerSafeStart = false;
     bird.y = PLAY_H / 2;
     bird.vy = FLAP;
     bird.rot = 0;
     bird.wing = 1;
     flapPop = 1;
     invulnFrames = 100;
-    ignoreInputFrames = 28; // ~0.45s — absorb post-ad click-through
+    ignoreInputFrames = 48; // ~0.8s — absorb post-ad click-through / retry taps
+    shopToast = 1.35;
+    shopToastText = "Resumed at Level " + formatLevel(level) + " · Score " + score;
+    continueSnapshot = null;
     ensureAudio();
     startMusicLoop(true);
     sfxFlap();
@@ -1682,14 +1753,27 @@
 
   async function requestRewardedContinue() {
     if (continueUsedThisRun || continueBusy || state !== State.OVER) return;
+    // Snapshot before any ad/token path so resume can restore if state is corrupted
+    takeContinueSnapshot();
     // Free continue token from daily streak reward
     if (continueTokens > 0) {
       if (spendContinueToken()) {
         continuePlay();
-        shopToast = 1;
-        shopToastText = "Continue token used (" + continueTokens + " left)";
+        shopToast = 1.35;
+        shopToastText = "Resumed at Level " + formatLevel(level) + " · Score " + score +
+          " (🎫 " + continueTokens + " left)";
         return;
       }
+    }
+    // Browser demo path (same idea as unlock simulate) — no AdMob in browser
+    if (isBrowserPlay()) {
+      continueBusy = true;
+      try {
+        continuePlay();
+      } catch (_) {
+        continueBusy = false;
+      }
+      return;
     }
     const ads = adsApi();
     if (!ads) return;
@@ -1702,9 +1786,13 @@
     try {
       const ok = await show();
       if (ok) continuePlay();
-      else continueBusy = false;
+      else {
+        continueBusy = false;
+        continueSnapshot = null;
+      }
     } catch (_) {
       continueBusy = false;
+      continueSnapshot = null;
     }
   }
 
@@ -1887,11 +1975,12 @@
     }
 
     if (state === State.START || state === State.OVER) {
+      // While ad/demo continue is in flight, ignore ALL canvas taps (no retry / other UI)
+      if (state === State.OVER && continueBusy) return;
       if (state === State.OVER && hitBtn(pt, uiButtons.continue)) {
         requestRewardedContinue();
         return;
       }
-      if (state === State.OVER && continueBusy) return;
       if (state === State.OVER && hitBtn(pt, uiButtons.safeStart)) {
         requestSafeStart();
         return;
@@ -2309,7 +2398,13 @@
     if (nearMissFlash > 0) nearMissFlash *= 0.9;
     if (screenShake > 0) screenShake *= 0.82;
     if (flapPop > 0) flapPop *= 0.78;
-    if (shopToast > 0) shopToast *= 0.96;
+    if (shopToast > 0) {
+      shopToast *= 0.96;
+      if (shopToast < 0.05) {
+        shopToast = 0;
+        shopToastText = "";
+      }
+    }
     if (bird.wing > 0) bird.wing *= 0.85;
     if (invulnFrames > 0) invulnFrames--;
     if (ignoreInputFrames > 0) ignoreInputFrames--;
@@ -3342,14 +3437,16 @@
       ads &&
       typeof ads.canOfferContinue === "function" &&
       ads.canOfferContinue();
+    const canDemoContinue = isBrowserPlay();
     const offerContinue =
       overTimer > 18 &&
       !continueUsedThisRun &&
       !continueBusy &&
-      (continueTokens > 0 || canAdContinue);
+      (continueTokens > 0 || canAdContinue || canDemoContinue);
 
+    // Continue first (above safe-start) so it is not mistaken for a restart
     if (offerContinue) {
-      const bw = 240;
+      const bw = 260;
       const bh = 36;
       const bx = (W - bw) / 2;
       const by = y;
@@ -3361,15 +3458,26 @@
       roundRect(bx, by, bw, bh, 12);
       ctx.stroke();
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const cLabel = continueTokens > 0
-        ? "Continue (🎫 " + continueTokens + ")"
-        : "Watch ad to continue";
+      let cLabel;
+      if (continueTokens > 0) {
+        cLabel = "Continue — resume Level " + formatLevel(level) + " (🎫 " + continueTokens + ")";
+      } else if (canDemoContinue && !canAdContinue) {
+        cLabel = "Continue (demo) — resume Level " + formatLevel(level);
+      } else {
+        cLabel = "Watch ad — resume Level " + formatLevel(level);
+      }
       ctx.fillText(cLabel, bx + bw / 2, by + bh / 2);
       uiButtons.continue = { x: bx, y: by, w: bw, h: bh };
       y += bh + 10;
+    } else if (continueBusy && overTimer > 18) {
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Watching ad…", W / 2, y + 6);
+      y += 22;
     } else if (continueUsedThisRun && overTimer > 18) {
       ctx.fillStyle = "rgba(255,255,255,0.55)";
       ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
@@ -3378,9 +3486,9 @@
       y += 22;
     }
 
-    // Safe-start nudge after harsh death streak
+    // Safe-start nudge AFTER continue — distinctly labeled so not mistaken for resume
     if (overTimer > 18 && offerSafeStart && canOfferSafeStartNudge() && !continueBusy) {
-      const bw = 240;
+      const bw = 260;
       const bh = 32;
       const bx = (W - bw) / 2;
       const by = y;
@@ -3388,13 +3496,10 @@
       roundRect(bx, by, bw, bh, 10);
       ctx.fill();
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 12px 'Segoe UI', system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      let used = "";
-      try { used = localStorage.getItem(SAFE_START_DAY_KEY) || ""; } catch (_) {}
-      const free = used !== todayKey();
-      ctx.fillText(free ? "Practice: safe start (free)" : "Watch ad: safe start", bx + bw / 2, by + bh / 2);
+      ctx.fillText("Practice restart (easy start)", bx + bw / 2, by + bh / 2);
       uiButtons.safeStart = { x: bx, y: by, w: bw, h: bh };
       y += bh + 10;
     }
@@ -3729,7 +3834,7 @@
     }
     ctx.restore();
 
-    if (shopToast > 0.05) {
+    if (shopToast > 0.05 && shopToastText) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, shopToast);
       ctx.fillStyle = "rgba(0,0,0,0.55)";
@@ -3770,38 +3875,41 @@
     uiButtons.skills = [];
     if (state !== State.PLAY) return;
     const buttons = [];
+    // Hide Glide button once used this run (including while glideFlapsLeft > 0)
     if (isOwned("skill_glide") && !glideUsedThisRun) buttons.push({ action: "glide", label: "Glide", hot: "1" });
     if (isOwned("skill_double") && !doubleUsedThisRun) buttons.push({ action: "double", label: "Boost", hot: "2" });
     if (isOwned("feat_slowmo") && !slowmoUsedThisRun) buttons.push({ action: "slowmo", label: "Slow", hot: "3" });
     if (isOwned("feat_hint") && level >= HINT_MIN_LEVEL) buttons.push({ action: "hint", label: "Hint", hot: "4" });
-    if (!buttons.length) return;
-    const bw = 54;
-    const bh = 28;
-    const gap = 6;
-    const totalW = buttons.length * bw + (buttons.length - 1) * gap;
-    let x = (W - totalW) / 2;
-    const y = H - GROUND_H - 36;
-    for (const b of buttons) {
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
-      roundRect(x, y, bw, bh, 8);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 1;
-      roundRect(x, y, bw, bh, 8);
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(b.label, x + bw / 2, y + bh / 2);
-      uiButtons.skills.push({ x: x, y: y, w: bw, h: bh, action: b.action });
-      x += bw + gap;
+    if (buttons.length) {
+      const bw = 54;
+      const bh = 28;
+      const gap = 6;
+      const totalW = buttons.length * bw + (buttons.length - 1) * gap;
+      let x = (W - totalW) / 2;
+      const y = H - GROUND_H - 36;
+      for (const b of buttons) {
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        roundRect(x, y, bw, bh, 8);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 1;
+        roundRect(x, y, bw, bh, 8);
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(b.label, x + bw / 2, y + bh / 2);
+        uiButtons.skills.push({ x: x, y: y, w: bw, h: bh, action: b.action });
+        x += bw + gap;
+      }
     }
     if (slowmoFrames > 0) {
       ctx.fillStyle = "rgba(100,180,255,0.15)";
       ctx.fillRect(0, 0, W, H);
     }
-    if (shopToast > 0.05 && state === State.PLAY) {
+    // Fading toast only (e.g. "Glide!") — never a permanent active-glide label
+    if (shopToast > 0.05 && shopToastText) {
       ctx.save();
       ctx.globalAlpha = Math.min(1, shopToast);
       ctx.fillStyle = "#ffe566";
@@ -3898,7 +4006,8 @@
     } else {
       drawBird();
       drawScoreHUD();
-      drawSkillHud();
+      // Skill HUD + skill toasts only while playing (never on OVER/START)
+      if (state === State.PLAY) drawSkillHud();
       if (state === State.OVER) drawOver();
     }
 

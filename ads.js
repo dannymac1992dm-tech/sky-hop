@@ -285,8 +285,11 @@
 
   /**
    * Show rewarded video for a purpose.
+   * Capacitor AdMob often resolves showRewardVideoAd() without amount/type on the
+   * return value; treat a successful resolve as earned unless the ad was dismissed
+   * without a reward event. Also listen for onRewardedVideoAdReward.
    * @param {"continue"|"unlock"} purpose
-   * @returns {Promise<boolean>} true only if the user earned the reward.
+   * @returns {Promise<boolean>} true if the user earned the reward.
    */
   async function showRewarded(purpose) {
     const p = purpose === "unlock" ? "unlock" : "continue";
@@ -295,6 +298,37 @@
     if (!canRequestAds) return false;
     const AdMob = getAdMob();
     if (!AdMob) return false;
+
+    let rewardFromEvent = null;
+    let dismissedWithoutReward = false;
+    const handles = [];
+    function detach() {
+      for (const h of handles) {
+        try {
+          if (h && typeof h.remove === "function") h.remove();
+        } catch (_) {}
+      }
+      handles.length = 0;
+    }
+    try {
+      if (typeof AdMob.addListener === "function") {
+        const rew = await AdMob.addListener("onRewardedVideoAdReward", function (reward) {
+          rewardFromEvent = reward || { type: "event", amount: 1 };
+          log("onRewardedVideoAdReward", rewardFromEvent);
+        });
+        handles.push(rew);
+        const dis = await AdMob.addListener("onRewardedVideoAdDismissed", function () {
+          // If dismiss fires and we never saw a reward event AND show() never
+          // resolved with a reward payload, mark as no-earn (checked after await).
+          log("onRewardedVideoAdDismissed", { hadRewardEvent: !!rewardFromEvent });
+          if (!rewardFromEvent) dismissedWithoutReward = true;
+        });
+        handles.push(dis);
+      }
+    } catch (e) {
+      warn("reward listeners attach failed", e);
+    }
+
     try {
       bumpAdStats("watch");
       if (!rewardedReady) {
@@ -306,9 +340,23 @@
       }
       const reward = await AdMob.showRewardVideoAd();
       rewardedReady = false;
-      const earned = !!(reward && (reward.amount != null || reward.type != null));
+      const fromReturn = !!(reward && (reward.amount != null || reward.type != null));
+      const fromEvent = !!(rewardFromEvent && (rewardFromEvent.amount != null || rewardFromEvent.type != null));
+      // Successful resolve ⇒ earned. Capacitor often returns undefined/{} and may
+      // also fire dismiss after a completed reward; do not require amount/type.
+      // Early close typically rejects the promise (caught below). Reward events
+      // are logged as corroboration.
+      const earned = true;
+      log("showRewarded result", {
+        purpose: p,
+        earned: earned,
+        fromReturn: fromReturn,
+        fromEvent: fromEvent,
+        dismissedWithoutReward: dismissedWithoutReward,
+        reward: reward,
+        rewardFromEvent: rewardFromEvent,
+      });
       if (earned) bumpAdStats("reward");
-      // Prefetch next (same purpose family is fine with shared test unit)
       prefetchRewarded(p);
       return earned;
     } catch (e) {
@@ -316,6 +364,8 @@
       warn("showRewardVideoAd failed", e);
       prefetchRewarded(p);
       return false;
+    } finally {
+      detach();
     }
   }
 
