@@ -20,6 +20,10 @@
   const TROPHY_KEY = "skyhop_trophies";
   const UNLOCKS_KEY = "skyhop_unlocks";
   const UNLOCK_PROGRESS_KEY = "skyhop_unlock_progress";
+  const DAILY_KEY = "skyhop_daily";
+  const CONTINUE_TOKENS_KEY = "skyhop_continue_tokens";
+  const SAFE_START_DAY_KEY = "skyhop_safe_start_day";
+  const SHARE_URL = "https://dannymac1992dm-tech.github.io/sky-hop/";
 
   // —— State ——
   const State = { START: 0, PLAY: 1, OVER: 2, TROPHIES: 3, SHOP: 4 };
@@ -63,6 +67,18 @@
   let invulnFrames = 0;
   let continueBusy = false;
   let ignoreInputFrames = 0; // post-continue: ignore taps so ad click-through doesn't flap/retry
+  // Retention / juice
+  let screenShake = 0;
+  let flapPop = 0;
+  let almostLine = "";
+  let deathStreakHarsh = 0;
+  let runStartFrame = 0;
+  let safeStartFrames = 0; // remaining soft-start assist pipes/frames
+  let safeStartActive = false;
+  let offerSafeStart = false;
+  let featuredUnlockId = null;
+  let continueTokens = parseInt(localStorage.getItem(CONTINUE_TOKENS_KEY) || "0", 10) || 0;
+  let shareBusy = false;
 
   // —— Freemium unlock catalog v1 ——
   const CATALOG = [
@@ -449,6 +465,322 @@
     } catch (_) {
       return true;
     }
+  }
+
+  // —— Daily challenge + streak ——
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function yesterdayKey() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function hashDate(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  function loadDaily() {
+    try {
+      const raw = localStorage.getItem(DAILY_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === "object") return data;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function saveDaily(data) {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify(data)); } catch (_) {}
+  }
+
+  function saveContinueTokens() {
+    try { localStorage.setItem(CONTINUE_TOKENS_KEY, String(continueTokens)); } catch (_) {}
+  }
+
+  function grantContinueToken(n) {
+    continueTokens = Math.max(0, (continueTokens | 0) + (n | 0));
+    saveContinueTokens();
+  }
+
+  function spendContinueToken() {
+    if (continueTokens <= 0) return false;
+    continueTokens--;
+    saveContinueTokens();
+    return true;
+  }
+
+  /** Build or refresh today's challenge (deterministic from date). */
+  function ensureDaily() {
+    const today = todayKey();
+    let data = loadDaily();
+    if (data && data.date === today && data.challenge) return data;
+    const h = hashDate(today);
+    const kinds = ["level", "pipes", "score"];
+    const kind = kinds[h % 3];
+    let target;
+    let label;
+    if (kind === "level") {
+      target = 3 + (h % 8); // Level 3–10
+      label = "Reach Level " + target;
+    } else if (kind === "pipes") {
+      target = 8 + (h % 18); // 8–25 pipes (score)
+      label = "Survive " + target + " pipes";
+    } else {
+      target = 12 + (h % 24); // score 12–35
+      label = "Score " + target + " points";
+    }
+    let streak = 0;
+    if (data && data.date === today) {
+      streak = data.streak | 0;
+    } else if (data && data.completed && data.date === yesterdayKey()) {
+      // Carry prior streak until today is completed (shown as current streak)
+      streak = data.streak | 0;
+    }
+    data = {
+      date: today,
+      challenge: { kind: kind, target: target, label: label },
+      completed: false,
+      streak: streak,
+      rewarded: false,
+    };
+    saveDaily(data);
+    return data;
+  }
+
+  function dailyProgressText(data) {
+    if (!data || !data.challenge) return "";
+    const c = data.challenge;
+    if (data.completed) return "Done! 🔥 streak " + (data.streak | 0);
+    if (c.kind === "level") return "Best today L" + Math.max(bestLevel, level) + " / L" + c.target;
+    if (c.kind === "pipes" || c.kind === "score") {
+      // Use run score on OVER; on START show best as soft progress
+      const cur = state === State.OVER ? score : Math.max(best, score);
+      return cur + " / " + c.target;
+    }
+    return "";
+  }
+
+  function checkDailyOnGameOver() {
+    const data = ensureDaily();
+    if (!data || data.completed || !data.challenge) return data;
+    const c = data.challenge;
+    let ok = false;
+    if (c.kind === "level") ok = level >= c.target;
+    else if (c.kind === "pipes" || c.kind === "score") ok = score >= c.target;
+    if (!ok) return data;
+    data.completed = true;
+    // streak: consecutive days with a completed challenge
+    let streak = 1;
+    const prior = loadDaily();
+    if (prior && prior.date === todayKey() && (prior.streak | 0) > 0 && prior.completed) {
+      streak = prior.streak | 0; // already counted today
+    } else if (prior && prior.date === yesterdayKey() && prior.completed) {
+      streak = (prior.streak | 0) + 1;
+    } else if (prior && prior.date === todayKey() && !prior.completed && (prior.streak | 0) > 0) {
+      // Carried streak from yesterday via ensureDaily
+      streak = (prior.streak | 0) + 1;
+    }
+    data.streak = streak;
+    if (!data.rewarded) {
+      data.rewarded = true;
+      grantContinueToken(1);
+      shopToast = 1.6;
+      shopToastText = "Daily done! +1 continue · 🔥" + data.streak;
+      sfxTrophy();
+      spawnParticles(W / 2, PLAY_H / 2, 20, "#ffd700");
+    }
+    saveDaily(data);
+    return data;
+  }
+
+  function pipesToNextLevel(s) {
+    const lv = levelFromScore(s);
+    if (lv >= MAX_LEVEL) return 999;
+    const nextAt = lv * PIPES_PER_LEVEL;
+    return Math.max(0, nextAt - s);
+  }
+
+  function pipesToNextEvo(s) {
+    const nextAt = (evolutionTier(s) + 1) * 10;
+    return Math.max(0, nextAt - s);
+  }
+
+  function goalChipInfo(s) {
+    const toLv = pipesToNextLevel(s);
+    const toEvo = pipesToNextEvo(s);
+    const nextLv = levelFromScore(s) + 1;
+    if (toEvo <= 0 && toLv <= 0) return { text: "", prefer: "none" };
+    // Prefer whichever is closer; tie → bird evolution (more exciting)
+    if (toEvo <= toLv) {
+      return {
+        text: toEvo === 1 ? "1 to next bird" : toEvo + " to next bird",
+        prefer: "evo",
+        n: toEvo,
+      };
+    }
+    return {
+      text: toLv === 1 ? "1 to Level " + nextLv : toLv + " to Level " + nextLv,
+      prefer: "level",
+      n: toLv,
+      nextLv: nextLv,
+    };
+  }
+
+  function computeAlmostLine(s, lv) {
+    const toLv = pipesToNextLevel(s);
+    const toEvo = pipesToNextEvo(s);
+    const bits = [];
+    if (toLv >= 1 && toLv <= 2) {
+      bits.push("Almost Level " + (lv + 1) + "!");
+    }
+    if (toEvo >= 1 && toEvo <= 2) {
+      bits.push(toEvo === 1 ? "1 pipe from next bird!" : toEvo + " pipes from next bird!");
+    }
+    return bits[0] || "";
+  }
+
+  function pickFeaturedUnlock() {
+    // Prefer locked skills, then feats, then birds
+    const order = ["skill", "feat", "bird"];
+    for (const kind of order) {
+      for (const it of CATALOG) {
+        if (it.kind !== kind || it.watches <= 0) continue;
+        if (isOwned(it.id)) continue;
+        return it;
+      }
+    }
+    // All owned — tease trail or a bird equip
+    for (const it of CATALOG) {
+      if (it.id === "feat_trail") return it;
+    }
+    return CATALOG[1] || CATALOG[0];
+  }
+
+  function haptic(kind) {
+    // kind: flap | crash | evolve | score | near
+    try {
+      const Cap = typeof window !== "undefined" ? window.Capacitor : null;
+      const H = Cap && Cap.Plugins && Cap.Plugins.Haptics;
+      if (H) {
+        if (kind === "crash" && H.vibrate) {
+          H.vibrate({ duration: 40 });
+          return;
+        }
+        if (kind === "evolve" && H.notification) {
+          H.notification({ type: "SUCCESS" });
+          return;
+        }
+        if (H.impact) {
+          const style = kind === "crash" ? "HEAVY" : kind === "flap" ? "LIGHT" : "MEDIUM";
+          H.impact({ style: style });
+          return;
+        }
+      }
+    } catch (_) {}
+    try {
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        if (kind === "crash") navigator.vibrate([30, 40, 50]);
+        else if (kind === "evolve") navigator.vibrate([20, 30, 20, 30, 40]);
+        else if (kind === "near") navigator.vibrate(12);
+        else if (kind === "score") navigator.vibrate(8);
+        else navigator.vibrate(10); // flap
+      }
+    } catch (_) {}
+  }
+
+  function canOfferSafeStartNudge() {
+    if (!offerSafeStart) return false;
+    const today = todayKey();
+    let used = "";
+    try { used = localStorage.getItem(SAFE_START_DAY_KEY) || ""; } catch (_) {}
+    // Free once/day; otherwise native rewarded can still offer
+    if (used !== today) return true;
+    const ads = adsApi();
+    return !!(ads && typeof ads.canOfferContinue === "function" && ads.canOfferContinue());
+  }
+
+  function markSafeStartUsed() {
+    try { localStorage.setItem(SAFE_START_DAY_KEY, todayKey()); } catch (_) {}
+  }
+
+  function activateSafeStart() {
+    safeStartActive = true;
+    safeStartFrames = 20; // ~first 20 pipes gentler via difficulty blend
+    offerSafeStart = false;
+    markSafeStartUsed();
+    shopToast = 1.2;
+    shopToastText = "Safe start — easy first pipes!";
+  }
+
+  async function requestSafeStart() {
+    if (state !== State.OVER || !offerSafeStart) return;
+    const today = todayKey();
+    let used = "";
+    try { used = localStorage.getItem(SAFE_START_DAY_KEY) || ""; } catch (_) {}
+    if (used !== today) {
+      // Free once per day
+      activateSafeStart();
+      startPlay();
+      return;
+    }
+    const ads = adsApi();
+    if (!ads || typeof ads.showRewarded !== "function") return;
+    if (typeof ads.canOfferContinue === "function" && !ads.canOfferContinue()) return;
+    continueBusy = true;
+    try {
+      const ok = await ads.showRewarded("continue");
+      continueBusy = false;
+      if (ok) {
+        activateSafeStart();
+        startPlay();
+      }
+    } catch (_) {
+      continueBusy = false;
+    }
+  }
+
+  async function shareRun() {
+    if (shareBusy) return;
+    shareBusy = true;
+    const msg = "I hit Level " + formatLevel(level) + " in Sky Hop! Score " + score + " — can you beat it?";
+    const url = SHARE_URL;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: "Sky Hop", text: msg, url: url });
+        shareBusy = false;
+        return;
+      }
+    } catch (_) { /* user cancel ok */ }
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(msg + " " + url);
+        shopToast = 1.2;
+        shopToastText = "Copied share text!";
+        shareBusy = false;
+        return;
+      }
+    } catch (_) {}
+    try {
+      const intent = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg + " " + url);
+      window.open(intent, "_blank", "noopener,noreferrer");
+    } catch (_) {}
+    shareBusy = false;
   }
 
   function resetRunPerks() {
@@ -880,14 +1212,23 @@
   }
 
   function sfxFlap() {
-    beep(520, 0.07, "square", 0.045);
+    beep(540, 0.055, "square", 0.055);
+    setTimeout(() => beep(720, 0.04, "square", 0.03), 35);
   }
   function sfxScore() {
-    beep(660, 0.08, "triangle", 0.07);
-    setTimeout(() => beep(880, 0.1, "triangle", 0.06), 70);
+    beep(700, 0.07, "triangle", 0.08);
+    setTimeout(() => beep(920, 0.09, "triangle", 0.07), 55);
+    setTimeout(() => beep(1100, 0.06, "sine", 0.035), 110);
   }
   function sfxHit() {
-    beep(140, 0.18, "sawtooth", 0.08);
+    beep(140, 0.2, "sawtooth", 0.1);
+    setTimeout(() => beep(90, 0.16, "sawtooth", 0.06), 60);
+  }
+  function sfxEvolveFanfare() {
+    beep(523, 0.08, "triangle", 0.07);
+    setTimeout(() => beep(659, 0.09, "triangle", 0.07), 70);
+    setTimeout(() => beep(784, 0.1, "triangle", 0.075), 140);
+    setTimeout(() => beep(1046, 0.16, "sine", 0.06), 230);
   }
   function sfxLevel() {
     beep(520, 0.06, "triangle", 0.05);
@@ -1001,10 +1342,26 @@
 
   function applyDifficulty() {
     const t = difficultyT(level);
-    pipeSpeed = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t;
-    pipeGap = BASE_GAP + (MIN_GAP - BASE_GAP) * t;
-    spawnEvery = Math.round(BASE_SPAWN + (MIN_SPAWN - BASE_SPAWN) * t);
-    gapMargin = BASE_GAP_MARGIN + (MAX_GAP_MARGIN - BASE_GAP_MARGIN) * t;
+    let speed = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t;
+    let gap = BASE_GAP + (MIN_GAP - BASE_GAP) * t;
+    let spawn = Math.round(BASE_SPAWN + (MIN_SPAWN - BASE_SPAWN) * t);
+    let margin = BASE_GAP_MARGIN + (MAX_GAP_MARGIN - BASE_GAP_MARGIN) * t;
+    // Soften first ~20 pipes (and safe-start assist): wider gaps, slightly slower
+    const earlyPipes = Math.max(0, Math.min(20, score));
+    let early = 1 - earlyPipes / 20; // 1 at start → 0 after 20
+    if (safeStartActive && safeStartFrames > 0) {
+      early = Math.max(early, Math.min(1, safeStartFrames / 20) * 0.85);
+    }
+    if (early > 0.02) {
+      speed = speed * (1 - 0.18 * early);
+      gap = gap + 28 * early;
+      spawn = Math.round(spawn + 12 * early);
+      margin = Math.max(28, margin - 8 * early);
+    }
+    pipeSpeed = speed;
+    pipeGap = gap;
+    spawnEvery = spawn;
+    gapMargin = margin;
   }
 
   function updateScoreMult() {
@@ -1022,12 +1379,16 @@
     const nextTier = evolutionTier(score);
     if (nextTier > prevTier) {
       const evo = evolutionMeta(score);
-      evolveFlash = 1.25;
+      evolveFlash = 1.55;
       evolveFlashText = "Bird evolved! " + evo.name;
       sfxMilestone();
+      sfxEvolveFanfare();
+      haptic("evolve");
+      screenShake = Math.max(screenShake, 0.45);
       const pal = activeBirdPalette(score);
-      spawnParticles(bird.x, bird.y, 18, pal.body1 || "#ffe566");
-      spawnParticles(bird.x, bird.y - 6, 10, pal.glow ? "#fff6a0" : (pal.body0 || "#fff"));
+      spawnParticles(bird.x, bird.y, 24, pal.body1 || "#ffe566");
+      spawnParticles(bird.x, bird.y - 6, 16, pal.glow ? "#fff6a0" : (pal.body0 || "#fff"));
+      spawnParticles(bird.x + 8, bird.y + 4, 10, "#ffffff");
     }
     if (level > prev) {
       levelFlash = 1;
@@ -1105,9 +1466,11 @@
     if (nearMiss) {
       cleanStreak = 0;
       nearMissFlash = 1;
-      spawnParticles(bird.x + 10, bird.y, 12, "#fff6a0");
-      spawnParticles(bird.x, bird.y - 8, 8, "#ffd54a");
+      screenShake = Math.max(screenShake, 0.7);
+      spawnParticles(bird.x + 10, bird.y, 14, "#fff6a0");
+      spawnParticles(bird.x, bird.y - 8, 10, "#ffd54a");
       sfxNearMiss();
+      haptic("near");
       // Soft assist: auto slow-mo once per run on near-miss if owned
       if (isOwned("feat_slowmo") && !slowmoUsedThisRun) tryActivateSlowmo();
     } else {
@@ -1126,9 +1489,15 @@
     if (nearMiss) add += 0; // sparkle only — no streak bonus
     const prevScore = score;
     score += add;
-    scorePop = 1;
+    scorePop = 1.15;
     onScoreChanged(prevScore);
     sfxScore();
+    haptic("score");
+    if (safeStartActive && safeStartFrames > 0) {
+      safeStartFrames--;
+      if (safeStartFrames <= 0) safeStartActive = false;
+      applyDifficulty();
+    }
   }
 
   // —— Reset ——
@@ -1174,23 +1543,39 @@
     scoreMult = 1;
     multPop = 0;
     nearMissFlash = 0;
+    screenShake = 0;
+    flapPop = 0;
+    almostLine = "";
     particles.length = 0;
     clearExtras();
     applyDifficulty();
   }
 
   function startPlay() {
+    const keepSafe = safeStartActive;
+    const keepSafeFrames = safeStartFrames;
     resetGame();
+    if (keepSafe) {
+      safeStartActive = true;
+      safeStartFrames = keepSafeFrames > 0 ? keepSafeFrames : 20;
+      applyDifficulty();
+    }
     continueUsedThisRun = false;
     continueBusy = false;
     invulnFrames = 0;
     ignoreInputFrames = 0;
+    offerSafeStart = false;
+    almostLine = "";
+    featuredUnlockId = null;
+    runStartFrame = frame;
     resetRunPerks();
     state = State.PLAY;
     ensureAudio();
     startMusicLoop(true);
     sfxFlap();
+    haptic("flap");
     bird.vy = FLAP;
+    flapPop = 1;
     unlockTrophy(1);
     hintFlashFrames = 0;
     hintPipeId = null;
@@ -1204,8 +1589,20 @@
     state = State.OVER;
     overTimer = 0;
     flash = 1;
+    screenShake = 1;
     softenMusic();
     sfxHit();
+    haptic("crash");
+    almostLine = computeAlmostLine(score, level);
+    const feat = pickFeaturedUnlock();
+    featuredUnlockId = feat ? feat.id : null;
+    // Harsh early death streak → optional safe-start nudge (not every death)
+    const runFrames = Math.max(0, frame - runStartFrame);
+    const harsh = score < 8 && runFrames < 320;
+    if (harsh) deathStreakHarsh++;
+    else deathStreakHarsh = 0;
+    offerSafeStart = deathStreakHarsh >= 3;
+    if (offerSafeStart) deathStreakHarsh = 0; // reset after offering once
     beatBestScore = false;
     beatBestLevel = false;
     if (score > best) {
@@ -1228,6 +1625,7 @@
     cleanStreak = 0;
     pipeStreak = 0;
     scoreMult = 1;
+    checkDailyOnGameOver();
     notifyAdsState();
   }
 
@@ -1252,25 +1650,47 @@
     for (let i = pipes.length - 1; i >= 0; i--) {
       if (pipes[i].x < clearUntil) pipes.splice(i, 1);
     }
+    // Also clear nearby extras hazards so continue always feels fair
+    for (let i = hunters.length - 1; i >= 0; i--) {
+      if (hunters[i].x < clearUntil) hunters.splice(i, 1);
+    }
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+      if (projectiles[i].x < clearUntil) projectiles.splice(i, 1);
+    }
+    for (let i = animals.length - 1; i >= 0; i--) {
+      if (animals[i].hazard && animals[i].x < clearUntil) animals.splice(i, 1);
+    }
     // Brief spawn delay so a new pipe doesn't appear on top of the bird
-    nextSpawn = Math.max(nextSpawn, Math.floor(spawnEvery * 0.75) || 40);
+    nextSpawn = Math.max(nextSpawn, Math.floor(spawnEvery * 0.9) || 50);
     state = State.PLAY;
     overTimer = 0;
     flash = 0;
+    almostLine = "";
     bird.y = PLAY_H / 2;
     bird.vy = FLAP;
     bird.rot = 0;
     bird.wing = 1;
-    invulnFrames = 90;
-    ignoreInputFrames = 25; // ~0.4s — absorb post-ad click-through
+    flapPop = 1;
+    invulnFrames = 100;
+    ignoreInputFrames = 28; // ~0.45s — absorb post-ad click-through
     ensureAudio();
     startMusicLoop(true);
     sfxFlap();
+    haptic("flap");
     notifyAdsState();
   }
 
   async function requestRewardedContinue() {
     if (continueUsedThisRun || continueBusy || state !== State.OVER) return;
+    // Free continue token from daily streak reward
+    if (continueTokens > 0) {
+      if (spendContinueToken()) {
+        continuePlay();
+        shopToast = 1;
+        shopToastText = "Continue token used (" + continueTokens + " left)";
+        return;
+      }
+    }
     const ads = adsApi();
     if (!ads) return;
     const show = typeof ads.showRewarded === "function"
@@ -1289,7 +1709,7 @@
   }
 
   async function requestUnlockWatch(itemId) {
-    if (shopBusy || state !== State.SHOP) return;
+    if (shopBusy || (state !== State.SHOP && state !== State.OVER)) return;
     const item = CATALOG_BY_ID[itemId];
     if (!item || item.watches <= 0) return;
     if (unlocks.owned.indexOf(itemId) >= 0) return;
@@ -1340,7 +1760,7 @@
   // Hit-test regions for UI buttons drawn on canvas
   const uiButtons = {
     trophies: null, shop: null, back: null, close: null, continue: null,
-    rows: null, skills: null,
+    rows: null, skills: null, share: null, featured: null, safeStart: null,
   };
 
   function flap() {
@@ -1361,7 +1781,10 @@
     if (state === State.PLAY) {
       bird.vy = FLAP;
       bird.wing = 1;
+      flapPop = 1;
       sfxFlap();
+      haptic("flap");
+      spawnParticles(bird.x - 6, bird.y + 4, 4, "#fff8c8");
       if (glideFlapsLeft > 0) glideFlapsLeft--;
       if (unlocks.equippedTrail && isOwned("feat_trail")) {
         spawnParticles(bird.x - 8, bird.y, 6, trailColor());
@@ -1407,6 +1830,27 @@
     return false;
   }
 
+  async function requestFeaturedUnlock() {
+    if (!featuredUnlockId) {
+      openShop();
+      return;
+    }
+    const item = CATALOG_BY_ID[featuredUnlockId];
+    if (!item) {
+      openShop();
+      return;
+    }
+    if (isOwned(item.id)) {
+      openShop();
+      return;
+    }
+    if (canNativeUnlockAd() || isBrowserPlay()) {
+      await requestUnlockWatch(item.id);
+      return;
+    }
+    openShop();
+  }
+
   function onPointer(e) {
     if (isHudTarget(e.target)) return;
     e.preventDefault();
@@ -1417,9 +1861,28 @@
         closeTrophies();
         return;
       }
-      // start drag for scroll
       trophyDragY = pt.y;
       trophyDragScroll = trophyScroll;
+      return;
+    }
+
+    if (state === State.SHOP) {
+      if (hitBtn(pt, uiButtons.back)) {
+        closeShop();
+        return;
+      }
+      if (uiButtons.rows && uiButtons.rows.length) {
+        for (const row of uiButtons.rows) {
+          if (hitBtn(pt, row)) {
+            if (row.action === "equip") equipBird(row.itemId);
+            else if (row.action === "toggleTrail") toggleTrailEquip();
+            else if (row.action === "watch" || row.action === "simulate") requestUnlockWatch(row.itemId);
+            return;
+          }
+        }
+      }
+      shopDragY = pt.y;
+      shopDragScroll = shopScroll;
       return;
     }
 
@@ -1428,11 +1891,38 @@
         requestRewardedContinue();
         return;
       }
-      // During rewarded ad / continueBusy, ignore canvas taps (don't restart run)
       if (state === State.OVER && continueBusy) return;
+      if (state === State.OVER && hitBtn(pt, uiButtons.safeStart)) {
+        requestSafeStart();
+        return;
+      }
+      if (state === State.OVER && hitBtn(pt, uiButtons.share)) {
+        shareRun();
+        return;
+      }
+      if (state === State.OVER && hitBtn(pt, uiButtons.featured)) {
+        requestFeaturedUnlock();
+        return;
+      }
+      if (hitBtn(pt, uiButtons.shop)) {
+        openShop();
+        return;
+      }
       if (hitBtn(pt, uiButtons.trophies)) {
         openTrophies();
         return;
+      }
+    }
+
+    if (state === State.PLAY && uiButtons.skills && uiButtons.skills.length) {
+      for (const b of uiButtons.skills) {
+        if (hitBtn(pt, b)) {
+          if (b.action === "glide") tryActivateGlide();
+          else if (b.action === "double") tryActivateDouble();
+          else if (b.action === "slowmo") tryActivateSlowmo();
+          else if (b.action === "hint") triggerHintFlash();
+          return;
+        }
       }
     }
 
@@ -1440,16 +1930,33 @@
   }
 
   function onPointerMove(e) {
-    if (state !== State.TROPHIES || trophyDragY == null) return;
-    e.preventDefault();
-    const pt = canvasToLocal(e);
-    const dy = trophyDragY - pt.y;
-    trophyScroll = Math.max(0, trophyDragScroll + dy);
-    clampTrophyScroll();
+    if (state === State.TROPHIES && trophyDragY != null) {
+      e.preventDefault();
+      const pt = canvasToLocal(e);
+      const dy = trophyDragY - pt.y;
+      trophyScroll = Math.max(0, trophyDragScroll + dy);
+      clampTrophyScroll();
+      return;
+    }
+    if (state === State.SHOP && shopDragY != null) {
+      e.preventDefault();
+      const pt = canvasToLocal(e);
+      const dy = shopDragY - pt.y;
+      shopScroll = Math.max(0, shopDragScroll + dy);
+      clampShopScroll();
+    }
   }
 
   function onPointerUp() {
     trophyDragY = null;
+    shopDragY = null;
+  }
+
+  function clampShopScroll() {
+    const rowH = 58;
+    const visibleH = H - 28 - 88;
+    const maxScroll = Math.max(0, CATALOG.length * rowH - visibleH);
+    shopScroll = Math.max(0, Math.min(maxScroll, shopScroll));
   }
 
   canvas.addEventListener("mousedown", onPointer);
@@ -1459,10 +1966,17 @@
   canvas.addEventListener("touchmove", onPointerMove, { passive: false });
   canvas.addEventListener("touchend", onPointerUp);
   canvas.addEventListener("wheel", (e) => {
-    if (state !== State.TROPHIES) return;
-    e.preventDefault();
-    trophyScroll += e.deltaY * 0.5;
-    clampTrophyScroll();
+    if (state === State.TROPHIES) {
+      e.preventDefault();
+      trophyScroll += e.deltaY * 0.5;
+      clampTrophyScroll();
+      return;
+    }
+    if (state === State.SHOP) {
+      e.preventDefault();
+      shopScroll += e.deltaY * 0.5;
+      clampShopScroll();
+    }
   }, { passive: false });
 
   window.addEventListener("keydown", (e) => {
@@ -1471,9 +1985,20 @@
       closeTrophies();
       return;
     }
+    if (e.code === "Escape" && state === State.SHOP) {
+      e.preventDefault();
+      closeShop();
+      return;
+    }
     if (e.code === "Space" || e.key === " ") {
       e.preventDefault();
-      if (state !== State.TROPHIES) flap();
+      if (state !== State.TROPHIES && state !== State.SHOP) flap();
+    }
+    if (state === State.PLAY) {
+      if (e.key === "1") tryActivateGlide();
+      if (e.key === "2") tryActivateDouble();
+      if (e.key === "3") tryActivateSlowmo();
+      if (e.key === "4") triggerHintFlash();
     }
   });
 
@@ -1782,6 +2307,8 @@
     if (newRecordFlash > 0) newRecordFlash *= 0.97;
     if (multPop > 0) multPop *= 0.92;
     if (nearMissFlash > 0) nearMissFlash *= 0.9;
+    if (screenShake > 0) screenShake *= 0.82;
+    if (flapPop > 0) flapPop *= 0.78;
     if (shopToast > 0) shopToast *= 0.96;
     if (bird.wing > 0) bird.wing *= 0.85;
     if (invulnFrames > 0) invulnFrames--;
@@ -2180,6 +2707,10 @@
   function drawBird() {
     ctx.save();
     ctx.translate(bird.x, bird.y);
+    if (flapPop > 0.04) {
+      const s = 1 + flapPop * 0.18;
+      ctx.scale(s, s);
+    }
     ctx.rotate(bird.rot);
 
     // Evolution feel: slightly snappier wing visual at higher tiers (cosmetic only)
@@ -2442,7 +2973,7 @@
     if (state !== State.PLAY && state !== State.OVER) return;
 
     const text = String(score);
-    const scale = 1 + scorePop * 0.35;
+    const scale = 1 + scorePop * 0.45;
     ctx.save();
     ctx.translate(W / 2, 48);
     ctx.scale(scale, scale);
@@ -2567,6 +3098,30 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillText(label, 12, 22);
       ctx.restore();
+
+      // On-run goal chip (top-right): closer of next bird / next level
+      const goal = goalChipInfo(score);
+      if (goal.text) {
+        ctx.save();
+        ctx.font = "bold 12px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        const gtw = ctx.measureText(goal.text).width;
+        const gx = W - 6, gy = 12, gw = gtw + 14, gh = 20, gr = 6;
+        const gLeft = gx - gw;
+        ctx.fillStyle = "rgba(20,50,30,0.55)";
+        ctx.beginPath();
+        ctx.moveTo(gLeft + gr, gy);
+        ctx.arcTo(gx, gy, gx, gy + gh, gr);
+        ctx.arcTo(gx, gy + gh, gLeft, gy + gh, gr);
+        ctx.arcTo(gLeft, gy + gh, gLeft, gy, gr);
+        ctx.arcTo(gLeft, gy, gx, gy, gr);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = goal.prefer === "evo" ? "#7dffb0" : "#ffe08a";
+        ctx.fillText(goal.text, W - 12, 22);
+        ctx.restore();
+      }
     }
 
     if (trophyFlash > 0.05) {
@@ -2686,6 +3241,9 @@
     uiButtons.trophies = null;
     uiButtons.shop = null;
     uiButtons.continue = null;
+    uiButtons.share = null;
+    uiButtons.featured = null;
+    uiButtons.safeStart = null;
     ctx.textAlign = "center";
     ctx.fillStyle = "#fff";
     ctx.font = "bold 52px 'Segoe UI', system-ui, sans-serif";
@@ -2708,7 +3266,24 @@
     ctx.fillStyle = "rgba(255,255,220,0.92)";
     ctx.fillText("Form: " + menuEvo.name + "  ·  evolves every 10 pipes", W / 2, 158);
 
-    if (extrasOn) {
+    // Daily challenge chip
+    const daily = ensureDaily();
+    if (daily && daily.challenge) {
+      ctx.fillStyle = "rgba(0,30,60,0.55)";
+      roundRect(W / 2 - 150, 172, 300, 44, 10);
+      ctx.fill();
+      ctx.fillStyle = daily.completed ? "#7dffb0" : "#ffe08a";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText("Daily: " + daily.challenge.label, W / 2, 188);
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+      const streakBit = (daily.streak | 0) > 0 ? " · 🔥 " + daily.streak : "";
+      const tok = continueTokens > 0 ? " · 🎫 " + continueTokens : "";
+      ctx.fillText(
+        (daily.completed ? "Completed today" : "Play to complete") + streakBit + tok,
+        W / 2, 206
+      );
+    } else if (extrasOn) {
       ctx.fillStyle = "rgba(255,255,200,0.7)";
       ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
       ctx.fillText("Extras on — trees, critters & hunters!", W / 2, 178);
@@ -2739,32 +3314,43 @@
     uiButtons.trophies = null;
     uiButtons.shop = null;
     uiButtons.continue = null;
+    uiButtons.share = null;
+    uiButtons.featured = null;
+    uiButtons.safeStart = null;
     const lines = [
       "Level  " + formatLevel(level),
       "Score  " + score,
       "Best score  " + best,
       "Best level  " + formatLevel(bestLevel),
     ];
+    if (almostLine) lines.push(almostLine);
     if (beatBestScore || beatBestLevel) lines.push("✦ New record!");
+    const daily = ensureDaily();
+    if (daily && daily.challenge) {
+      if (daily.completed) lines.push("Daily ✓  🔥" + (daily.streak | 0));
+      else lines.push("Daily: " + daily.challenge.label);
+    }
     const panel = drawPanel(
       "Game Over",
       lines,
       overTimer > 18 ? "Tap / Space to retry (free)" : "…"
     );
     // Keep Retry / continue / trophies above native banner (padding via --ad-banner-pad)
-    let y = panel.py + panel.ph + 24;
+    let y = panel.py + panel.ph + 18;
     const ads = typeof window !== "undefined" ? window.SkyHopAds : null;
+    const canAdContinue =
+      ads &&
+      typeof ads.canOfferContinue === "function" &&
+      ads.canOfferContinue();
     const offerContinue =
       overTimer > 18 &&
       !continueUsedThisRun &&
       !continueBusy &&
-      ads &&
-      typeof ads.canOfferContinue === "function" &&
-      ads.canOfferContinue();
+      (continueTokens > 0 || canAdContinue);
 
     if (offerContinue) {
       const bw = 240;
-      const bh = 40;
+      const bh = 36;
       const bx = (W - bw) / 2;
       const by = y;
       ctx.fillStyle = "rgba(40, 120, 200, 0.92)";
@@ -2775,22 +3361,96 @@
       roundRect(bx, by, bw, bh, 12);
       ctx.stroke();
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 15px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "bold 14px 'Segoe UI', system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("Watch ad to continue", bx + bw / 2, by + bh / 2);
+      const cLabel = continueTokens > 0
+        ? "Continue (🎫 " + continueTokens + ")"
+        : "Watch ad to continue";
+      ctx.fillText(cLabel, bx + bw / 2, by + bh / 2);
       uiButtons.continue = { x: bx, y: by, w: bw, h: bh };
-      y += bh + 16;
+      y += bh + 10;
     } else if (continueUsedThisRun && overTimer > 18) {
       ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.font = "12px 'Segoe UI', system-ui, sans-serif";
+      ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Continue already used this run", W / 2, y + 8);
-      y += 28;
+      ctx.fillText("Continue already used this run", W / 2, y + 6);
+      y += 22;
     }
 
-    drawShopButton(W / 2 - 70, y + 8);
-    drawTrophyButton(W / 2 + 70, y + 8);
+    // Safe-start nudge after harsh death streak
+    if (overTimer > 18 && offerSafeStart && canOfferSafeStartNudge() && !continueBusy) {
+      const bw = 240;
+      const bh = 32;
+      const bx = (W - bw) / 2;
+      const by = y;
+      ctx.fillStyle = "rgba(60, 160, 100, 0.92)";
+      roundRect(bx, by, bw, bh, 10);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      let used = "";
+      try { used = localStorage.getItem(SAFE_START_DAY_KEY) || ""; } catch (_) {}
+      const free = used !== todayKey();
+      ctx.fillText(free ? "Practice: safe start (free)" : "Watch ad: safe start", bx + bw / 2, by + bh / 2);
+      uiButtons.safeStart = { x: bx, y: by, w: bw, h: bh };
+      y += bh + 10;
+    }
+
+    // Featured unlock tease
+    if (overTimer > 18 && featuredUnlockId) {
+      const item = CATALOG_BY_ID[featuredUnlockId];
+      if (item) {
+        const owned = isOwned(item.id);
+        const bw = 260;
+        const bh = 34;
+        const bx = (W - bw) / 2;
+        const by = y;
+        ctx.fillStyle = owned ? "rgba(80,120,80,0.85)" : "rgba(100,70,180,0.9)";
+        roundRect(bx, by, bw, bh, 10);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        let label;
+        if (owned) label = "Shop · " + item.name + " ready";
+        else if (canNativeUnlockAd() || isBrowserPlay()) {
+          const prog = progressFor(item.id);
+          label = "Unlock " + item.name + " (" + prog + "/" + item.watches + ")";
+        } else {
+          label = "Shop tease · " + item.name;
+        }
+        ctx.fillText(label, bx + bw / 2, by + bh / 2);
+        uiButtons.featured = { x: bx, y: by, w: bw, h: bh, itemId: item.id };
+        y += bh + 10;
+      }
+    }
+
+    // Share + shop/trophies row
+    if (overTimer > 18) {
+      const shW = 100;
+      const shH = 32;
+      const shX = W / 2 - 160;
+      const shY = y;
+      ctx.fillStyle = "rgba(30,140,200,0.9)";
+      roundRect(shX, shY, shW, shH, 10);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("📤 Share", shX + shW / 2, shY + shH / 2);
+      uiButtons.share = { x: shX, y: shY, w: shW, h: shH };
+
+      drawShopButton(W / 2 + 10, y + 16);
+      drawTrophyButton(W / 2 + 130, y + 16);
+    } else {
+      drawShopButton(W / 2 - 70, y + 8);
+      drawTrophyButton(W / 2 + 70, y + 8);
+    }
   }
 
   function drawTrophyIcon(x, y, lv, unlockedFlag) {
@@ -3214,6 +3874,13 @@
       return;
     }
 
+    const shakeOn = screenShake > 0.04 && (state === State.PLAY || state === State.OVER);
+    if (shakeOn) {
+      ctx.save();
+      const mag = screenShake * 5;
+      ctx.translate((Math.random() - 0.5) * mag * 2, (Math.random() - 0.5) * mag * 2);
+    }
+
     drawSky();
     drawClouds();
     drawHills();
@@ -3237,11 +3904,13 @@
 
     drawParticles();
     drawFlash();
+    if (shakeOn) ctx.restore();
     requestAnimationFrame(loop);
   }
 
   resetGame();
   state = State.START;
+  ensureDaily();
   notifyAdsState();
   requestAnimationFrame(loop);
 })();
