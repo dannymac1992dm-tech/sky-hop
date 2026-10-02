@@ -69,10 +69,10 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 </head>
 <body>
 <h1>Privacy Policy — Sky Hop</h1>
-<p class="note"><strong>Draft for publisher review — not legal advice.</strong></p>
-<p class="meta"><strong>Effective date:</strong> September 15, 2026</p>
+<p class="meta"><strong>Effective date:</strong> October 1, 2026</p>
+<p class="meta"><strong>Last updated:</strong> October 1, 2026</p>
 <p class="meta"><strong>Publisher:</strong> Danny Oudeesh (Danny Oudeesh, indie publisher)</p>
-<p class="meta"><strong>Contact:</strong> [CONTACT EMAIL]</p>
+<p class="meta"><strong>Contact:</strong> renthome9295@gmail.com</p>
 <p class="meta"><strong>Privacy Policy URL:</strong> https://dannymac1992dm-tech.github.io/sky-hop/privacy.html</p>
 <hr>
 <h2>1. Introduction</h2>
@@ -84,20 +84,24 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <thead><tr><th>Topic</th><th>Current practice</th></tr></thead>
 <tbody>
 <tr><td>Accounts / login</td><td>None — we do not create accounts</td></tr>
-<tr><td>What the App stores on your device</td><td>High score and mute preference only (local device storage)</td></tr>
+<tr><td>What the App stores on your device</td><td>Game progress and settings only (scores, coins, unlocks, skills, daily challenge, sound and graphics settings), in local device storage</td></tr>
 <tr><td>What we collect on our own servers</td><td>Nothing — there is no Sky Hop backend for scores or profiles</td></tr>
-<tr><td>Ads</td><td>Planned: Google AdMob (or similar) after packaging for Google Play; ads may collect data as described below</td></tr>
-<tr><td>Children under 13</td><td>Not marketed as a kids-only app; if directed to children under 13, ads and data practices must change (see Section 7)</td></tr>
+<tr><td>Ads</td><td>The Android app currently shows Google AdMob ads (banner ads and optional rewarded ads). Google may collect data such as the advertising ID, IP address, and ad interaction data, as described in Section 4</td></tr>
+<tr><td>Consent</td><td>Where required (for example in the EEA, UK, and Switzerland), Google’s consent message is shown in the App. You can change ad settings as described in Section 4</td></tr>
+<tr><td>Purchases</td><td>None. Coins, the shop, and skills are in-game only and cannot be bought with real money</td></tr>
+<tr><td>Children under 13</td><td>Sky Hop is for a general audience and is not directed at children under 13 (see Section 7)</td></tr>
 </tbody></table>
 <hr>
 <h2>3. Information we process</h2>
 <h3>3.1 Data stored only on your device (today)</h3>
 <p>Sky Hop currently stores the following <strong>locally on your device</strong> (for example via browser <code>localStorage</code> or equivalent on a wrapped native build):</p>
 <ul>
-<li><strong>High score / best score</strong> — so your best result can be shown next time you play</li>
-<li><strong>Mute preference</strong> — whether sound effects and music are muted</li>
+<li><strong>High score / best score and best level</strong> — so your best result can be shown next time you play</li>
+<li><strong>Game progress</strong> — in-game coins, shop items, birds, skins, trails, skills and upgrades, trophies, goals, daily challenge progress, and continue tokens</li>
+<li><strong>Settings</strong> — whether sound is muted, whether extras are on, and graphics quality</li>
+<li><strong>Rewarded ad counters</strong> — a simple count of rewarded ads watched, used by the game to track unlock progress</li>
 </ul>
-<p>This data stays on your device. It is <strong>not</strong> uploaded to servers operated by Danny Oudeesh because the game does not use accounts, cloud save, or a publisher analytics backend for these preferences.</p>
+<p>This data stays on your device. It is <strong>not</strong> uploaded to servers operated by Danny Oudeesh because the game does not use accounts, cloud save, or a publisher analytics backend.</p>
 <p>You can typically clear this data by clearing the App’s storage / site data, or by uninstalling the App (exact steps depend on your device and browser).</p>
 <h3>3.2 Technical and device information (general)</h3>
 <p>Like most apps and websites, when Sky Hop runs on a device or is loaded in a browser, the underlying platform may expose standard technical information (for example device type, OS version, screen size, or network-related signals used by the OS or WebView). The Game itself does not require you to provide a name, email, phone number, or payment card for play.</p>
@@ -110,60 +114,66 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <li>Collect your name, postal address, or government ID for gameplay</li>
 <li>Sell your personal information as a standalone product</li>
 <li>Operate a publisher-run chat, social graph, or cloud leaderboard</li>
+<li>Offer real-money purchases. Coins, the shop, and skills are in-game only; coins are earned by playing (and some items can be unlocked by watching optional rewarded ads)</li>
 </ul>
-<p>If these practices change, this policy will be updated (see Section 10).</p>
+<p>If you use the in-game <strong>Share</strong> button, your device’s share sheet (or clipboard) is used to share a short message with your level and score. Nothing is shared unless you choose to share it.</p>
+<p>If these practices change, this policy will be updated (see Section 13).</p>
 <hr>
-<h2>4. Advertising (Google AdMob or similar)</h2>
-<p>Sky Hop is planned as a <strong>free download</strong> monetized with ads after packaging (for example with Capacitor) for <strong>Google Play</strong> (Android first), and possibly other stores later.</p>
-<p>When advertising SDKs such as <strong>Google AdMob</strong> (or a similar ad network) are integrated:</p>
-<h3>4.1 What ads may collect or use</h3>
-<p>Advertising partners may collect or process information such as:</p>
+<h2>4. Advertising (Google AdMob)</h2>
+<p>Sky Hop is a <strong>free download</strong> on <strong>Google Play</strong>. The Android app <strong>currently shows ads from Google AdMob</strong>, Google’s mobile advertising service. The free web version of the game at the hosted site does not show AdMob ads.</p>
+<p>The App shows two kinds of ads:</p>
 <ul>
-<li>Advertising identifiers (for example Android Advertising ID / similar identifiers, subject to platform rules and your settings)</li>
-<li>Device and app information (device model, OS version, app version, language, time zone)</li>
-<li>IP address and approximate location derived from network signals</li>
-<li>Ad interaction data (impressions, clicks, and whether ads were shown)</li>
-<li>Diagnostic or crash-related data needed to deliver and measure ads</li>
+<li><strong>Banner ads</strong> on the menu and game-over screens. Banners are hidden while you are playing.</li>
+<li><strong>Rewarded ads</strong>, which are always <strong>optional</strong>. A rewarded ad plays only if you tap to watch one, for example to continue a run after a crash, to double the coins from a run, or to unlock skills or items early. If you don’t want to watch one, just skip it and keep playing.</li>
 </ul>
-<p>Exact categories depend on the SDK configuration (for example personalized vs. non-personalized ads), your device settings, and applicable law (including consent where required).</p>
+<p>Ads in the App are limited to content suitable for a general audience.</p>
+<h3>4.1 What ads may collect or use</h3>
+<p>The Google Mobile Ads SDK in the App may collect or process information such as:</p>
+<ul>
+<li>Device identifiers, such as the Android advertising ID (subject to platform rules and your settings)</li>
+<li>IP address, which may be used to estimate your general location</li>
+<li>Usage and ad interaction data (for example app launches, ads shown, taps on ads, and whether a rewarded ad was completed)</li>
+<li>Device and app information (device model, OS version, app version, language)</li>
+<li>Diagnostic data needed to deliver ads, measure them, and prevent fraud</li>
+</ul>
+<p>This data is collected and used by Google, not by Danny Oudeesh. Exact categories depend on your consent choices, your device settings, and applicable law (for example whether personalized or non-personalized ads are shown).</p>
 <h3>4.2 Purpose of ad-related processing</h3>
 <p>Ads are used to:</p>
 <ul>
-<li>Show advertisements in the App</li>
+<li>Show advertisements in the App, which keeps the App free</li>
 <li>Measure ad performance and prevent fraud / invalid traffic</li>
-<li>Where allowed and configured, personalize ads based on interests or activity</li>
+<li>Where you have allowed it and the law permits, personalize ads based on interests or activity</li>
 </ul>
-<h3>4.3 Third-party privacy policies</h3>
-<p>Ad partners process data under <strong>their own</strong> privacy policies. For Google advertising products, review Google’s policies and disclosures, including materials for AdMob / Google Play ads. Links and product names may change; check Google’s current documentation when you publish.</p>
-<p><strong>Placeholder for publisher to list live links at ship time:</strong></p>
+<h3>4.3 Google’s policies</h3>
+<p>Google processes ad-related data under its own privacy policy. To learn how Google uses information from apps that use its services, see <a href="https://policies.google.com/technologies/partner-sites">How Google uses information from sites or apps that use our services</a> (https://policies.google.com/technologies/partner-sites). Google’s Privacy Policy is at <a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a>.</p>
+<p>Sky Hop does not use other ad networks or mediation partners.</p>
+<h3>4.4 Consent message</h3>
+<p>Sky Hop uses Google’s consent tool (the User Messaging Platform). When the App starts, it checks with Google whether a consent message is required where you live. If it is (for example in the European Economic Area, the UK, and Switzerland), the App shows Google’s consent message, where you can choose whether to allow personalized ads and related data use. Depending on your choices and region, Google may show non-personalized ads, limited ads, or no ads.</p>
+<p>The App’s consent setup also covers privacy laws in certain US states, which give residents the right to opt out of the “sale” or “sharing” of personal information for targeted advertising. The App does not currently show a separate in-app opt-out screen for these laws; you can limit targeted ads by deleting or resetting your advertising ID and managing ad personalization as described in Section 4.5.</p>
+<h3>4.5 Changing your consent and other ad controls</h3>
 <ul>
-<li>Google AdMob / Google advertising privacy disclosures: [AD NETWORK PRIVACY URL]</li>
-<li>Other ad or mediation partners (if any): [ADDITIONAL PARTNER PRIVACY URLS]</li>
-</ul>
-<h3>4.4 Your ad controls</h3>
-<p>Depending on your device and region, you may be able to:</p>
-<ul>
-<li>Reset or limit advertising identifiers in system settings</li>
-<li>Opt out of personalized advertising where the platform or AdMob consent flows offer that choice</li>
-<li>Manage consent via in-app consent forms where required (for example in the EEA/UK)</li>
+<li><strong>Change your consent choice:</strong> The App does not currently have an in-app button to reopen the consent message. To make a new choice, clear Sky Hop’s app data (on most Android devices: Settings &gt; Apps &gt; Sky Hop &gt; Storage &gt; Clear storage) or uninstall and reinstall the App. Where the consent message applies in your region, it will be shown again the next time you open the App. Note that clearing app data also deletes your local game progress.</li>
+<li><strong>Reset or delete your advertising ID:</strong> On most Android devices, go to Settings &gt; Google &gt; Ads (on some devices, Settings &gt; Privacy &gt; Ads). There you can <strong>reset</strong> your advertising ID, or on newer Android versions <strong>delete</strong> it, which stops apps from using it for personalized ads.</li>
+<li><strong>Opt out of personalized ads more generally:</strong> You can manage Google’s ad personalization at <a href="https://myadcenter.google.com/">https://myadcenter.google.com/</a>.</li>
+<li><strong>Skip rewarded ads:</strong> Rewarded ads are optional. You never have to watch one to keep playing.</li>
 </ul>
 <hr>
 <h2>5. How we use information</h2>
 <table>
 <thead><tr><th>Use</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td>Gameplay</td><td>Store high score and mute preference on device so the Game works as expected</td></tr>
-<tr><td>Ads (when integrated)</td><td>Allow ad networks to serve and measure ads that fund the free App</td></tr>
+<tr><td>Gameplay</td><td>Store scores, game progress, and settings on device so the Game works as expected</td></tr>
+<tr><td>Ads</td><td>Allow Google AdMob to serve and measure ads that fund the free App (see Section 4)</td></tr>
 <tr><td>Legal / safety</td><td>Comply with law, respond to lawful requests, and protect against abuse of the App or ads</td></tr>
 <tr><td>Policy updates</td><td>Communicate material changes if we have a contact channel for that purpose</td></tr>
 </tbody></table>
-<p>We do not use your high score or mute preference for advertising targeting, because those values remain on-device under the current design.</p>
+<p>We do not use your scores, game progress, or settings for advertising targeting, because those values remain on-device under the current design.</p>
 <hr>
 <h2>6. Sharing and third parties</h2>
 <p>We do not sell your personal information.</p>
 <p>We may share or allow processing by:</p>
 <ul>
-<li><strong>Advertising partners</strong> (for example Google AdMob) when ads are enabled — see Section 4</li>
+<li><strong>Google AdMob</strong>, which serves the ads in the App — see Section 4</li>
 <li><strong>Platform providers</strong> (Google Play, Apple App Store if published there, device OS vendors) under their terms</li>
 <li><strong>Service providers</strong> who help host this Privacy Policy page or support email, if used</li>
 <li><strong>Authorities</strong> when required by law</li>
@@ -171,7 +181,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <p>Sky Hop source and packaging may use open-source or commercial SDKs; those components’ privacy practices apply to the data they process.</p>
 <hr>
 <h2>7. Children’s privacy (COPPA and similar rules)</h2>
-<p>Sky Hop is intended for a <strong>general audience</strong>. It is <strong>not</strong> marketed as a kids-only or under-13 product unless Danny Oudeesh later designates it as such in store listings and age ratings.</p>
+<p>Sky Hop is intended for a <strong>general audience</strong> and is <strong>not directed at children under 13</strong>. It is not marketed as a kids-only or under-13 product.</p>
 <p><strong>Important note:</strong> If the Game is <strong>directed to children under 13</strong> (or otherwise treated as a child-directed app under COPPA or similar laws), advertising and data practices <strong>must change</strong>. In that case, the publisher must:</p>
 <ul>
 <li>Use child-directed / family-safe ad configurations where available</li>
@@ -179,8 +189,8 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <li>Obtain verifiable parental consent where legally required</li>
 <li>Update this Privacy Policy, store Data safety disclosures, and AdMob / store settings accordingly</li>
 </ul>
-<p>Until those changes are made and disclosed, do not treat Sky Hop as a COPPA-compliant child-directed product solely based on this draft.</p>
-<p>Parents or guardians who believe a child has provided personal information inappropriately may contact [CONTACT EMAIL] or [SUPPORT EMAIL].</p>
+<p>Until those changes are made and disclosed, do not treat Sky Hop as a COPPA-compliant child-directed product solely based on this policy.</p>
+<p>Parents or guardians who believe a child has provided personal information inappropriately may contact renthome9295@gmail.com.</p>
 <hr>
 <h2>8. Your rights and choices</h2>
 <p>Depending on where you live (for example EEA, UK, California, and other regions), you may have rights to:</p>
@@ -190,7 +200,7 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <li>Withdraw consent where processing is based on consent</li>
 <li>Lodge a complaint with a supervisory authority</li>
 </ul>
-<p><strong>How to exercise rights:</strong> Contact [CONTACT EMAIL] or [SUPPORT EMAIL]. Because Sky Hop currently stores only local high score and mute data on your device, many “deletion” requests for gameplay prefs are best handled by clearing App storage or uninstalling. Requests about <strong>ad-related</strong> data may need to be directed in part to the advertising partner (for example Google) using their tools.</p>
+<p><strong>How to exercise rights:</strong> Email renthome9295@gmail.com. Because Sky Hop stores game progress and settings only on your device, “deletion” requests for that data are best handled by clearing App storage or uninstalling. Requests about <strong>ad-related</strong> data may need to be directed in part to Google using its tools (see Section 4).</p>
 <p>We may need to verify your request and may decline requests that are unlawful, abusive, or cannot be authenticated.</p>
 <hr>
 <h2>9. International transfers</h2>
@@ -198,16 +208,16 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <hr>
 <h2>10. Data retention</h2>
 <ul>
-<li><strong>On-device high score and mute preference:</strong> Kept until you clear App/site storage or uninstall the App.</li>
-<li><strong>Ad-related data:</strong> Retained by ad partners according to their policies and legal requirements — not controlled day-to-day by the Game’s local storage.</li>
-<li><strong>Support emails:</strong> If you email [SUPPORT EMAIL] or [CONTACT EMAIL], we may retain correspondence as needed to respond and for legitimate business or legal records.</li>
+<li><strong>On-device game progress and settings:</strong> Kept until you clear App/site storage or uninstall the App.</li>
+<li><strong>Ad-related data:</strong> Retained by Google according to its policies and legal requirements — not controlled by Danny Oudeesh or the Game’s local storage.</li>
+<li><strong>Support emails:</strong> If you email renthome9295@gmail.com, we may retain correspondence as needed to respond and for legitimate business or legal records.</li>
 </ul>
 <hr>
 <h2>11. Security</h2>
 <p>We take reasonable steps appropriate to a small indie game (for example relying on platform security for packaged builds). No method of electronic storage or transmission is 100% secure. Please use official store downloads and keep your device updated.</p>
 <hr>
 <h2>12. Third-party links and stores</h2>
-<p>Sky Hop may be distributed through Google Play and possibly other app stores. Those stores and any linked third-party sites have their own privacy practices. This policy covers the Sky Hop App as published by Danny Oudeesh, not the entire Google or Apple ecosystems.</p>
+<p>Sky Hop is distributed through Google Play and may be offered in other app stores later. Those stores and any linked third-party sites have their own privacy practices. This policy covers the Sky Hop App as published by Danny Oudeesh, not the entire Google or Apple ecosystems.</p>
 <hr>
 <h2>13. Changes to this policy</h2>
 <p>We may update this Privacy Policy from time to time. The <strong>Effective date</strong> at the top will change when we do. Material changes may also be noted in the App store listing or in-App notice where practical. Continued use after an update means you accept the revised policy, to the extent permitted by law.</p>
@@ -215,9 +225,8 @@ footer nav { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 <hr>
 <h2>14. Contact</h2>
 <p class="meta"><strong>Publisher / privacy contact:</strong> Danny Oudeesh</p>
-<p class="meta"><strong>Email:</strong> [CONTACT EMAIL]</p>
-<p class="meta"><strong>Support:</strong> [SUPPORT EMAIL]</p>
-<p class="meta"><strong>Postal / other contact (optional):</strong> [PUBLISHER POSTAL ADDRESS]</p>
+<p class="meta"><strong>Email:</strong> renthome9295@gmail.com</p>
+<p class="meta"><strong>Support:</strong> renthome9295@gmail.com</p>
 <p>If you have questions about this Privacy Policy or Sky Hop’s data practices, use the contacts above.</p>
 <hr>
 <p><em>Sky Hop is an original flap-style game with original name, art, and sound. It is not affiliated with Flappy Bird or its rights holders.</em></p>
