@@ -28,6 +28,13 @@ html, body {
   background: radial-gradient(ellipse at center, #2a4055 0%, #152030 100%);
   /* Native AdMob banner (BOTTOM_CENTER) — ads.js sets --ad-banner-pad when shown */
   padding-bottom: var(--ad-banner-pad, 0px);
+  /* v1.9.1: keep the canvas out of the status bar / camera cutout. On the Fold's inner screen the
+     canvas is height-limited and filled the screen top-to-bottom, so the top-left Back button sat
+     under the (edge-to-edge, targetSdk 36) status bar, which swallows taps. --sh-inset-* come from
+     MainActivity (WindowInsets), env() covers browsers / newer WebViews. */
+  padding-top: max(env(safe-area-inset-top, 0px), var(--sh-inset-top, 0px));
+  padding-left: max(env(safe-area-inset-left, 0px), var(--sh-inset-left, 0px));
+  padding-right: max(env(safe-area-inset-right, 0px), var(--sh-inset-right, 0px));
   box-sizing: border-box;
 }
 
@@ -47,8 +54,8 @@ html, body {
 
 #hud-btns {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  right: max(12px, env(safe-area-inset-right));
+  top: max(12px, env(safe-area-inset-top), var(--sh-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right), var(--sh-inset-right, 0px));
   z-index: 10;
   display: flex;
   gap: 8px;
