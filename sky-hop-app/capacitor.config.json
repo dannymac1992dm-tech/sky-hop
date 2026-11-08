@@ -1,0 +1,11 @@
+{
+  "appId": "com.skyhop.mobile",
+  "appName": "Sky Hop",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,0 +1,907 @@
+{
+  "source_root": "/workspace/skyhop-1.20-work",
+  "baseline": "1.20-candidate / versionCode 24",
+  "included_locations": [
+    "flappy-clone/",
+    "sky-hop-app/",
+    "root build/checksum/store-text documents"
+  ],
+  "excluded_sensitive_filenames": [
+    {
+      "path": "sky-hop-app/RELEASE-SIGNING.md",
+      "reason": "signing instructions omitted (credential-like assignments)"
+    },
+    {
+      "path": "sky-hop-app/android/keystore.properties",
+      "reason": "sensitive or machine-local filename"
+    },
+    {
+      "path": "sky-hop-app/android/local.properties",
+      "reason": "sensitive or machine-local filename"
+    }
+  ],
+  "excluded_all": [
+    {
+      "path": "sky-hop-app/RELEASE-SIGNING.md",
+      "reason": "signing instructions omitted (credential-like assignments)"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/capacitor.config.json",
+      "reason": "generated Capacitor metadata"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/capacitor.plugins.json",
+      "reason": "generated Capacitor metadata"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/.gitkeep",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/ads.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/cordova.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/cordova_plugins.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/economy.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/game.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/index.html",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/sky-hop.html",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/assets/public/style.css",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/android/keystore.properties",
+      "reason": "sensitive or machine-local filename"
+    },
+    {
+      "path": "sky-hop-app/android/local.properties",
+      "reason": "sensitive or machine-local filename"
+    },
+    {
+      "path": "sky-hop-app/www/.gitkeep",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/ads.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/economy.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/game.js",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/index.html",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/sky-hop.html",
+      "reason": "dependency/cache/generated output"
+    },
+    {
+      "path": "sky-hop-app/www/style.css",
+      "reason": "dependency/cache/generated output"
+    }
+  ],
+  "files": [
+    {
+      "path": "BUILD-1.15-NOTES.md",
+      "bytes": 1900,
+      "sha256": "877e296acf0d1fd406114faa74968146237f80f5dc9fcb2e02f71dc1155f5b60"
+    },
+    {
+      "path": "BUILD-1.16-NOTES.md",
+      "bytes": 3623,
+      "sha256": "f10fbc6ba093dd45ab6f80789bdc89e83f33c212d73730beb637a08ea5b688ca"
+    },
+    {
+      "path": "BUILD-1.17-NOTES.md",
+      "bytes": 11655,
+      "sha256": "52885e7e2c7ca9b790c4d9cbda654d3eddaf174777f7e2d42739ede83989f120"
+    },
+    {
+      "path": "BUILD-1.18-NOTES.md",
+      "bytes": 9491,
+      "sha256": "69320a1ddd22c1407e9c9aa010954395cb6ccbf71f7e5bf540e6f84ee3a35f9f"
+    },
+    {
+      "path": "BUILD-1.19-NOTES.md",
+      "bytes": 7689,
+      "sha256": "28e2eecba350b01de27106e64517c9775de8cb36915fd797ab8f753da3d036ff"
+    },
+    {
+      "path": "BUILD-1.19-NOTES.pre-size.md",
+      "bytes": 3089,
+      "sha256": "9ed1c382ff3372f239e37ea0a1fa5fb2f54fdd9798692c9141f634fcb024cce6"
+    },
+    {
+      "path": "BUILD-1.20-NOTES.md",
+      "bytes": 2172,
+      "sha256": "fb9970cad9e58947bba86496d87b651bc3e519b22a9ac0c9e1b29fa7a27d9a9a"
+    },
+    {
+      "path": "SHA256SUMS-1.17.txt",
+      "bytes": 205,
+      "sha256": "08af56257d8254adb790a309034e012968447a1d338e644c6fe42b9adbdd2860"
+    },
+    {
+      "path": "SHA256SUMS-1.18.txt",
+      "bytes": 769,
+      "sha256": "e05e55706c2c15b3f5d3b1b13d9e0a89fb9cc940d7c77d9a649159bee3aacd15"
+    },
+    {
+      "path": "SHA256SUMS-1.19.txt",
+      "bytes": 468,
+      "sha256": "da2766ae9412caf86e918c8b9e99e89dd921ba4529c3b23ce71133a9c3abb517"
+    },
+    {
+      "path": "SHA256SUMS-1.20.txt",
+      "bytes": 382,
+      "sha256": "b205d4faea4e2e89b11b5a85db847503b18f95723893d6d13d1958c8d5e8e607"
+    },
+    {
+      "path": "STORE-TEXT-1.17.md",
+      "bytes": 8437,
+      "sha256": "67790e038e00130fe3f8e089bd3efd1a73497f567ede8ddc8d114456ff040975"
+    },
+    {
+      "path": "STORE-TEXT-1.17.pre-legal.md",
+      "bytes": 8461,
+      "sha256": "03c321f9aa0550fdafe9aa506897185710f14c9087ee9bbd47e10158ff6aceef"
+    },
+    {
+      "path": "STORE-TEXT-1.17.pre-war.md",
+      "bytes": 7035,
+      "sha256": "c4dc7c7d03f8b39431afd807b1895c4976d0cb3db4ec33a3849d961c74d77a59"
+    },
+    {
+      "path": "STORE-TEXT-1.18.md",
+      "bytes": 11212,
+      "sha256": "328dcf09cfb1e907b32aaf087ae729a4b14f5b62c3c35cfe5aeeaae174fe906f"
+    },
+    {
+      "path": "STORE-TEXT-1.19.md",
+      "bytes": 11181,
+      "sha256": "70a6e79ec4983d4ca9ae489839088039e216e3aa6ef6e8e5350e1f57b0d6de54"
+    },
+    {
+      "path": "STORE-TEXT-1.19.pre-size.md",
+      "bytes": 10837,
+      "sha256": "b60d8d39f347ae1512a0dc5fea02cd846af2059c60696d891ca8e3add2b363a1"
+    },
+    {
+      "path": "STORE-TEXT-1.19.pre-steer.md",
+      "bytes": 10940,
+      "sha256": "f514f639036c605566b693fef547f9145a99dd0ac4c38a14c9aad473a9db626f"
+    },
+    {
+      "path": "STORE-TEXT-1.19.pre-villain.md",
+      "bytes": 11369,
+      "sha256": "6a72b83251ee6bef738fa6acb50b2a7d5a9f5f1d3ff55ff2daffe3ef4b09f8fe"
+    },
+    {
+      "path": "STORE-TEXT-1.20.md",
+      "bytes": 11665,
+      "sha256": "fcd5d1e68aec26683ce13b32f733ad89d659442da7d564caada01c83e23a2b66"
+    },
+    {
+      "path": "flappy-clone/AUDIO-LICENSE.md",
+      "bytes": 2254,
+      "sha256": "373160f5515190a2f821c27c8a645f866a79802c7fd221b2b8222faf424c401f"
+    },
+    {
+      "path": "flappy-clone/README.md",
+      "bytes": 18024,
+      "sha256": "6a73cf73d2b85ae52cb9c96b63edf28ee6cef68251bab44ae7a178bce2774666"
+    },
+    {
+      "path": "flappy-clone/ads.js",
+      "bytes": 54836,
+      "sha256": "9f333e11ea32927ee72b5173475b59c3019e553aa7869ca899fb8a00aa7cdcd1"
+    },
+    {
+      "path": "flappy-clone/economy.js",
+      "bytes": 56954,
+      "sha256": "8a4e659635f2d5068c0a0f21fa49d967e972719e407b8a51d417458d7863c0df"
+    },
+    {
+      "path": "flappy-clone/game.js",
+      "bytes": 575490,
+      "sha256": "5fdf1fa78496c80e13003b9d1d22825c83b5bcae86236e5a80fb54a522f697ea"
+    },
+    {
+      "path": "flappy-clone/index.html",
+      "bytes": 1022,
+      "sha256": "2c2d021296d02b064b462dae7c25c2d3749865023b71a873c21a886dcefde052"
+    },
+    {
+      "path": "flappy-clone/legal-index.html",
+      "bytes": 1149,
+      "sha256": "32b6438a780e9ccd14e8ed1c0954aaee89d3cacb1fbfeefe20d86c68eba5e266"
+    },
+    {
+      "path": "flappy-clone/privacy.html",
+      "bytes": 14249,
+      "sha256": "14d0053b1c2099ff82645796869325fab8f962d99c9cc67ba818bf73b0cbf400"
+    },
+    {
+      "path": "flappy-clone/sky-hop.html",
+      "bytes": 1022,
+      "sha256": "2c2d021296d02b064b462dae7c25c2d3749865023b71a873c21a886dcefde052"
+    },
+    {
+      "path": "flappy-clone/style.css",
+      "bytes": 3153,
+      "sha256": "db0a4e2bb295ee11976522c9a9bcef0771ae4c220c67b9b8a4059b81edfa3d7f"
+    },
+    {
+      "path": "flappy-clone/terms.html",
+      "bytes": 12231,
+      "sha256": "489baeca71a85df57ab8d0edd8ac6591e5e4e568f1a343497f34994ba29370f8"
+    },
+    {
+      "path": "sky-hop-app/.gitignore",
+      "bytes": 283,
+      "sha256": "ecc5fcb0bdad75a6426cfa0ea38f1e0e28efb8ef1bcb3e539bbca5c98af33dc5"
+    },
+    {
+      "path": "sky-hop-app/.nvmrc",
+      "bytes": 3,
+      "sha256": "f14b4987904bcb5814e4459a057ed4d20f58a633152288a761214dcd28780b56"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.10-NOTES.md",
+      "bytes": 3597,
+      "sha256": "591653f16a603cbd1f318bdece035c66504549f82cc0b61177980c72186ef0e1"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.11-NOTES.md",
+      "bytes": 7444,
+      "sha256": "2a461c23696462721504f2df07960e710c8dff9d1ead940118b3190d50d71dd1"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.12-NOTES.md",
+      "bytes": 16407,
+      "sha256": "e027f72bb5cb4637e2ae528a80bda6a7c6fd634c91ac9f5f20acd118a712bb8e"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.4-NOTES.md",
+      "bytes": 1336,
+      "sha256": "db5968e00bf1dc54acff0fec13c2d5ca57543ec443b1df2856c9d458f0d1113f"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.5-NOTES.md",
+      "bytes": 4993,
+      "sha256": "c4fbdac1eed695d577abaf1244dbe788b9f3ae6ba3d172a6e981a2d3f8bdfb66"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.6-NOTES.md",
+      "bytes": 1744,
+      "sha256": "4ae42ec7ac67db1399fcac9199f78896c01d34aef0ccfed6c5b4e3443dd81a4b"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.7-NOTES.md",
+      "bytes": 6197,
+      "sha256": "032c40392f83989af76bbb1589f17f77bd6fd8c467c0b0c483fa21428c9b7e71"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.8-NOTES.md",
+      "bytes": 11199,
+      "sha256": "1ded1591698cf99333087b933dc23b044eacd9a9866f5ea99fb384ad5ae1c0f1"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.9-NOTES.md",
+      "bytes": 1112,
+      "sha256": "49899a657c29329b1f25f66716a6e56f65359334bf10139db321c93b4d703a6a"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.9.1-NOTES.md",
+      "bytes": 1265,
+      "sha256": "fe4e15eed8c38b3995399e22ff4d0b9304c1e8fde0adf421b7d944c6235b7550"
+    },
+    {
+      "path": "sky-hop-app/BUILD-1.9.2-NOTES.md",
+      "bytes": 1981,
+      "sha256": "d4f5da2fcff1d7dfb04cf1f09ceb1478486c17f015277b1c9ba884e7f75e5d02"
+    },
+    {
+      "path": "sky-hop-app/README.md",
+      "bytes": 6442,
+      "sha256": "ed7b474877e69de68f6b9da21b162ae9b5dfa78fa4b157acca1215ba11a01740"
+    },
+    {
+      "path": "sky-hop-app/android/.gitignore",
+      "bytes": 1758,
+      "sha256": "0a06bb479c5d18922a04b02ee5bfaf09d9c06f62b196f843d25ec8b7c5db377d"
+    },
+    {
+      "path": "sky-hop-app/android/app/.gitignore",
+      "bytes": 26,
+      "sha256": "99c54e51ee601a60fbde8016b2cbf717483bc2e92773be86c9247d02a7fa6ea4"
+    },
+    {
+      "path": "sky-hop-app/android/app/build.gradle",
+      "bytes": 2987,
+      "sha256": "db5c7fcf46ed96f64a3970b723214d45fb6161a030dc9e7d284babf77d829db2"
+    },
+    {
+      "path": "sky-hop-app/android/app/capacitor.build.gradle",
+      "bytes": 426,
+      "sha256": "a8751a54238eaed1b6e3abb2e572c71098647abb8ea22a36a7e9ba1b1c0aae0f"
+    },
+    {
+      "path": "sky-hop-app/android/app/proguard-rules.pro",
+      "bytes": 751,
+      "sha256": "1cf8c57e8f79c250b0af9c1a5a4edad71a5c348a79ab70243b6bae086c150ad2"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+      "bytes": 774,
+      "sha256": "ff50b4c110a7434312f9af54171f9e8523b015836f707c9b387b76d4c38a97f8"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/AndroidManifest.xml",
+      "bytes": 2827,
+      "sha256": "2cbe1f1fcee7e42f8a8b17bab032a8f372d0867777c11ddafe1539c8f67a7f27"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/java/com/skyhop/mobile/MainActivity.java",
+      "bytes": 3814,
+      "sha256": "5ac6473b917a9933a432b0805c81066b2de0d205608ae7127327f392231e037e"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/java/com/skyhop/mobile/SkyHopApp.java",
+      "bytes": 2537,
+      "sha256": "36adfe32174543ba784ca4cedfba4a58d3baaea6da6fb73529f401611f47d71f"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/java/com/skyhop/mobile/SkyHopNativePlugin.java",
+      "bytes": 11981,
+      "sha256": "dde0440a38e443541cf6ceda94cce1b4b29ee71670654ddeb5e974a7e09bb0fa"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable/splash.png",
+      "bytes": 27995,
+      "sha256": "e883a34bdc7d3411ddc6d2fc7622e50ac0ed3570fb195046cefd2b325752fb2d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable/splash_icon.xml",
+      "bytes": 680,
+      "sha256": "a3e37c14f294378f4c4f504fb9f6c006ad37eb7f07ba02fa095ee7a296c68e60"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-land-hdpi/splash.png",
+      "bytes": 57153,
+      "sha256": "7a8bcfb245789b8c86f8bcaaa2351ff049203a51116e913ef06343b954144f84"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-land-mdpi/splash.png",
+      "bytes": 27995,
+      "sha256": "e883a34bdc7d3411ddc6d2fc7622e50ac0ed3570fb195046cefd2b325752fb2d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-land-xhdpi/splash.png",
+      "bytes": 113720,
+      "sha256": "ce7c724cc4111ef41583dbac1c1f3c9c37ecb0bb1fb1bc7e8de627bec269e428"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-land-xxhdpi/splash.png",
+      "bytes": 185349,
+      "sha256": "92592026ed37616b956451f558aae9516e89bc9140dd4dc10e7c48634a38ed0b"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-land-xxxhdpi/splash.png",
+      "bytes": 302116,
+      "sha256": "1468b5867ae3233476ace4d79e3a16f6fda059b3ce153081a862b123844e797b"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-nodpi/splash_icon_art.png",
+      "bytes": 567815,
+      "sha256": "71ebdd91531043bc7f07775f6e1bda63be0e24791cd7e7dba1eca33745dd1ce9"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-port-hdpi/splash.png",
+      "bytes": 57247,
+      "sha256": "7bd87fa5116a25e7cb2220289bcf06d77bc0b961497c5b99c6da8394b379fd5c"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-port-mdpi/splash.png",
+      "bytes": 28050,
+      "sha256": "6e658e59dda03e51bae9dae1f26cec47f997c974f718e6eb11f979b3b27dfcf4"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-port-xhdpi/splash.png",
+      "bytes": 113552,
+      "sha256": "5bec898fafac2281875a3c2a91fc48e01fa2d9d5a840452de0b4436959f443a4"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-port-xxhdpi/splash.png",
+      "bytes": 183346,
+      "sha256": "3ca12cb934413b9dfcb886a09c2d95542c71160c72164f3f9d85b779c25526c0"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/drawable-port-xxxhdpi/splash.png",
+      "bytes": 298899,
+      "sha256": "8a2310e553ad997cfa8431a6d0de36b9575a8e032904fa717af67bf120268ca0"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/layout/activity_main.xml",
+      "bytes": 535,
+      "sha256": "5d770feb791313b947020cbfc57e5c733c556dac5e9e49261a1190e527073253"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "bytes": 423,
+      "sha256": "c175a7496cf25c5dae1f1bb58d925bb327bbfa8140dc1a7166fcc7faaa9685a8"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "bytes": 423,
+      "sha256": "c175a7496cf25c5dae1f1bb58d925bb327bbfa8140dc1a7166fcc7faaa9685a8"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "bytes": 11305,
+      "sha256": "6528cbfaa501ab929f8d888f0c0ab062a00e924f3d226f86d80ad17aa72521bc"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-hdpi/ic_launcher_background.png",
+      "bytes": 37579,
+      "sha256": "6b6e60019d01f8c47bd76a5506d3273fa272268cd15050c68b23f201fbe61e1e"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+      "bytes": 16694,
+      "sha256": "52cadb1a2918bd09b702d4b5cb5ed8d4cca13752750366986b68758f829cba1d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.png",
+      "bytes": 4327,
+      "sha256": "d2a3cc1dfc5a0ec3e09db3296bf9769f83f2c2c8c71b5a6d24c78002a334cff6"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+      "bytes": 10358,
+      "sha256": "65192cc5cd6c42733c12acf555dd2abbdad6e828e47d981c5c2fb7a17a53e918"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "bytes": 5610,
+      "sha256": "44837d2a977dcf56b222707d96f0346a2d9e4532d62bf509567a4dba31b2ebca"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-mdpi/ic_launcher_background.png",
+      "bytes": 18886,
+      "sha256": "d7327cb4f697a1adaa8f8ffe2d37261c78c58bc437fc6675e34feff6af72202c"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "bytes": 8281,
+      "sha256": "e51b40f5a6791afd875ecce31520b7691420d7f5348e7532eef92549be811c96"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.png",
+      "bytes": 2558,
+      "sha256": "5ac6cf0bca24f1e9b462cb4d0f1fa2d8376de72101adf714f1a5aac74db3e49e"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+      "bytes": 5247,
+      "sha256": "1237ca02810db66ecf514389220f5a85cb0e52d9fdd511ab38b202d141ffe7b9"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "bytes": 18660,
+      "sha256": "687dcd68060c5a9ae299b82d13832c851f05575ee0730cdcbda0a1f1af51ce4d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_background.png",
+      "bytes": 61223,
+      "sha256": "8506acf3982fedf07b791bf943d2f0788063c6c3b93f3bc994af00cc11b98394"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+      "bytes": 27801,
+      "sha256": "55381266fb1169b3f18397bd9291fe5f77d04d47e5b046c5d069d3e2e7c544ab"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.png",
+      "bytes": 6418,
+      "sha256": "51b4bd441e059f5207d8424eb9cc537f9468cbbb5fa8da47fb560fa959e92d63"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+      "bytes": 17063,
+      "sha256": "23bc70625ac874fe89d27f286837aac848f0f2f99cffa0782267514feaafd98c"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "bytes": 37282,
+      "sha256": "e88bcbf7f8bd570af6dfa4c6196f3c46085e9b5b742b75f01cd3a99127f97a56"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_background.png",
+      "bytes": 124266,
+      "sha256": "70c7aefe01323d1433dfffb99f42c34bf99b1b15f2fcd8fdd12a6059cb69999f"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "bytes": 57021,
+      "sha256": "4659678629da9074a8a1d34e55662f4cadd6c3a87779679a9eac959c267fc669"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.png",
+      "bytes": 11820,
+      "sha256": "21c1aa34517b3a85bd4c872dee1a11ed2d66d23cb2e0db71a6c945a4baf5681d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+      "bytes": 33669,
+      "sha256": "96a62d6f6c44142a6eaacf8a3eae84023515069ca2632acab971977710811a92"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "bytes": 60432,
+      "sha256": "291dad6d48a6c0ce5ab788dde1a52518d0c9977bf3f1e97c7fe61cc535960273"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png",
+      "bytes": 191343,
+      "sha256": "535c1e3cfce8adff7417441bd9fae6607a46a307746a0aa137cc1791ac37b13f"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "bytes": 90491,
+      "sha256": "f3b50e9832e03f5f836276e7d7b9fa4a2701d91ffee40bbe0e660e59f1e9b7d9"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.png",
+      "bytes": 16322,
+      "sha256": "568412305daf3526648024fed133755732c4a48feccd1d3545e212c5d4f7ca2a"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "bytes": 54367,
+      "sha256": "71dfc91e5ed73e414265bd42fdd56d93117e21b5060db39bd2946b5f06162a6a"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/values/ic_launcher_background.xml",
+      "bytes": 244,
+      "sha256": "e0e0910fe6362f6dd7da9d8f58463b12a801bcc3921d15d32c6e52269fef2076"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/values/strings.xml",
+      "bytes": 769,
+      "sha256": "b31f98db8f277e45c2a8de815a7e291f2995df95a529df196788d615f8ecfb00"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/values/styles.xml",
+      "bytes": 1153,
+      "sha256": "1cf871ff0d08a8aeaa0fe5142a8a4d7ece6deb6f3eff86e65fd0beed69a52f5d"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/xml/config.xml",
+      "bytes": 185,
+      "sha256": "e9dcda493e663c5c4db9e3cb3bd968477a6e90aa8840bcbba40d72ed54b767ce"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/main/res/xml/file_paths.xml",
+      "bytes": 213,
+      "sha256": "a46ed43ef65c90cb6778f4581decf3556e3f0055aad8f36d69dae16f9a0e99aa"
+    },
+    {
+      "path": "sky-hop-app/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+      "bytes": 402,
+      "sha256": "d4045ae8fac1f0807e6b24eb34e68409a9a235df9d1a3f896fb8c9a49424363d"
+    },
+    {
+      "path": "sky-hop-app/android/build.gradle",
+      "bytes": 637,
+      "sha256": "46ade7db7afeb8049ccea59fce83095dca736ceb8c9acd79cc944e988c3357d9"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor-cordova-android-plugins/build.gradle",
+      "bytes": 1668,
+      "sha256": "28e3fa281f4d1e388bf98abc7f5bb31e672516e385c165c719d201ed54b8236e"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor-cordova-android-plugins/cordova.variables.gradle",
+      "bytes": 312,
+      "sha256": "b13104b34f7738abceec358ae8226ba5e64855e97babde54a115880e9b9bd47b"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml",
+      "bytes": 210,
+      "sha256": "2e3e383475f0e6cb76f0a7b46017a546663fba8e5bd1ef2a537412afac2ee9b5"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor-cordova-android-plugins/src/main/java/.gitkeep",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor-cordova-android-plugins/src/main/res/.gitkeep",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "sky-hop-app/android/capacitor.settings.gradle",
+      "bytes": 359,
+      "sha256": "130ef858109ae62d1e5a536e381698895b98f73d478bbec8c2108051b305232b"
+    },
+    {
+      "path": "sky-hop-app/android/gradle/wrapper/gradle-wrapper.jar",
+      "bytes": 43764,
+      "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172"
+    },
+    {
+      "path": "sky-hop-app/android/gradle/wrapper/gradle-wrapper.properties",
+      "bytes": 253,
+      "sha256": "9a479a85aa879bb55284fc16d0de5b81a745c3854f4e2d88c42e7debaf007435"
+    },
+    {
+      "path": "sky-hop-app/android/gradle.properties",
+      "bytes": 987,
+      "sha256": "3bab15c5b8bc4c2f4b6cf525497d15ad4abca53a460e6dd2eb0f0135817d31e6"
+    },
+    {
+      "path": "sky-hop-app/android/gradlew",
+      "bytes": 8733,
+      "sha256": "b187b4c52e749f5760afdd6fadc31b2a98ad35fb249bf0dff03b72650f320409"
+    },
+    {
+      "path": "sky-hop-app/android/gradlew.bat",
+      "bytes": 2937,
+      "sha256": "1d297e00bd21de3ace22b4d7f2de1f9dfa858883d66bbf7c1ccbecccec8f4f3b"
+    },
+    {
+      "path": "sky-hop-app/android/settings.gradle",
+      "bytes": 208,
+      "sha256": "6ce098d15ebd69b44c4ecd786bca1bdc366340d2459b2af4d7bb0ab317aa9669"
+    },
+    {
+      "path": "sky-hop-app/android/variables.gradle",
+      "bytes": 498,
+      "sha256": "83d502c9ed8fcf1dd4791482067abeedbebae49fafe9cd14a8a1f5891deb0d88"
+    },
+    {
+      "path": "sky-hop-app/capacitor.config.json",
+      "bytes": 177,
+      "sha256": "3afac0df3605fdffb7a6e091724d958c8461ad399f7c1c3e066b538720b10e2a"
+    },
+    {
+      "path": "sky-hop-app/icon-src/adaptive-preview.png",
+      "bytes": 461214,
+      "sha256": "b2964863fd541ead56c00c1dcf95218c76a527b28318d6df203cf612bb81b46d"
+    },
+    {
+      "path": "sky-hop-app/icon-src/art-fullbleed-1024.png",
+      "bytes": 43513,
+      "sha256": "80946e1f78d3380e27fb978665e55a257e96a0c38d0232259aa2f15fc819f802"
+    },
+    {
+      "path": "sky-hop-app/icon-src/art-phoenix-1024.png",
+      "bytes": 1008374,
+      "sha256": "b3cab378c8d8efeae8d0ceef21bd5d4f4b68052ad6d3ee837889347a4e77c9f2"
+    },
+    {
+      "path": "sky-hop-app/icon-src/contact.png",
+      "bytes": 93351,
+      "sha256": "618b7fbafd50188e405a24666c301b30bf192cf71b195dffa50e1d0670b8af4f"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/drawable-nodpi/splash_icon_art.png",
+      "bytes": 72951,
+      "sha256": "654c8f5d0b675ba89e48379f8711e660f81d02d09f5376402a3695d96a483061"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-anydpi-v26/ic_launcher.xml",
+      "bytes": 423,
+      "sha256": "c175a7496cf25c5dae1f1bb58d925bb327bbfa8140dc1a7166fcc7faaa9685a8"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "bytes": 423,
+      "sha256": "c175a7496cf25c5dae1f1bb58d925bb327bbfa8140dc1a7166fcc7faaa9685a8"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-hdpi/ic_launcher.png",
+      "bytes": 4304,
+      "sha256": "b2ba842ad69a32850153027a42ae29de13505ae1d3e5f929f9fac2ab2f16048e"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-hdpi/ic_launcher_background.png",
+      "bytes": 2662,
+      "sha256": "fcd4a72bdac32f015156823ded9e9590c1b9eb9c8399e6cff22cbf2dfd66c71e"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-hdpi/ic_launcher_foreground.png",
+      "bytes": 3698,
+      "sha256": "0470adb1d1195883b98e018c481cc4cdff2cf618d815d4535c3eb29ceb8bec59"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-hdpi/ic_launcher_monochrome.png",
+      "bytes": 1736,
+      "sha256": "7f2d4e4474d5ddcfcccd6fe1bed1798963b47dec1b8253503ba91e455065f069"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-hdpi/ic_launcher_round.png",
+      "bytes": 5494,
+      "sha256": "c405c945b94b802ed7079c6eb36ba29e188e14414750712e43560343b77a58bf"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-mdpi/ic_launcher.png",
+      "bytes": 2701,
+      "sha256": "1b3b391fc819d571f9817b6e0f70b4bba867303829bee8283c953205fb468553"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-mdpi/ic_launcher_background.png",
+      "bytes": 1723,
+      "sha256": "ee5d5126e660694bbd10caf716cead7c3129f1098d3ec8a68a6e2bc65ca03cdf"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-mdpi/ic_launcher_foreground.png",
+      "bytes": 2213,
+      "sha256": "3066e030642b84ed1722f708eab6438dc88683c3214f0109411e7f89762b3afa"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-mdpi/ic_launcher_monochrome.png",
+      "bytes": 1085,
+      "sha256": "5e5bdd4d915b0199267c1f5e6c6b6fbf614cf314ced2e71c91e53f08feb44f22"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-mdpi/ic_launcher_round.png",
+      "bytes": 3441,
+      "sha256": "d85f996fddace7562019e8b3811cabf4292399f62063ce7f52f98747f4fdddeb"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xhdpi/ic_launcher.png",
+      "bytes": 5880,
+      "sha256": "4f41c5fbaa20170903c257beb8058640a516596538bb859b7709b0ec5b31a324"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xhdpi/ic_launcher_background.png",
+      "bytes": 3493,
+      "sha256": "d2f0c0119363a8291a67006335f100b82ea5651ee0a19d2612973712d0ec100b"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xhdpi/ic_launcher_foreground.png",
+      "bytes": 5209,
+      "sha256": "6cdb17e5799d4cd29c6d42992aff076bd6a865904cb4200e0564a4357761e223"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xhdpi/ic_launcher_monochrome.png",
+      "bytes": 2528,
+      "sha256": "4f648699c0ceef6c3d9af7c89528e54e949a0ba31fdd60d8c04c72142f687281"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xhdpi/ic_launcher_round.png",
+      "bytes": 7512,
+      "sha256": "9c57265cf665c44221ef8d31979ecc843a497d76c1dbcff1b2403647e0964b4a"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxhdpi/ic_launcher.png",
+      "bytes": 9046,
+      "sha256": "8327ff7d73114e2a1803dd597487c065e58ca62d53657387125da91481273539"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxhdpi/ic_launcher_background.png",
+      "bytes": 5300,
+      "sha256": "3f2817f7968362a9c7f486a8bbfea9ee0053030fbf8facb454b0a648ada95852"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "bytes": 8397,
+      "sha256": "d81cea6527ba134305b8928df530e92466a6343f5f056ee0ea5386f3a2312208"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxhdpi/ic_launcher_monochrome.png",
+      "bytes": 4283,
+      "sha256": "3b3a098adf7d37060798cea2d59cf2ec3d0530185b8be9904895b76cf1f0a24f"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxhdpi/ic_launcher_round.png",
+      "bytes": 11188,
+      "sha256": "b94a49e3cd9a4613fba5e485e8ac07ec39880321a0dfef02d12a24d260a958e3"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxxhdpi/ic_launcher.png",
+      "bytes": 11841,
+      "sha256": "8d856e4512982073fb1d2f5ed760aca1ae66f2f259ab12e6f7afac47385f02c7"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxxhdpi/ic_launcher_background.png",
+      "bytes": 7134,
+      "sha256": "c1861094989c4ed18fc1ecf994c6d51670c5e38812c776d6a1391c42bd6b9b18"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "bytes": 12018,
+      "sha256": "10a3887dbc4d5a3c924b100add95975e0d886c186b055268222d4f25d6307659"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxxhdpi/ic_launcher_monochrome.png",
+      "bytes": 6065,
+      "sha256": "38f2f53a7dcc89d6848f7623c2c6a2ed0d8d7ed3e52f7befe032f9ae1e809170"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/mipmap-xxxhdpi/ic_launcher_round.png",
+      "bytes": 15254,
+      "sha256": "90cbaa9567d3c011593a6e380a4d938b58443707b4031b676b3259175ba4b9c5"
+    },
+    {
+      "path": "sky-hop-app/icon-src/old-icons-pre-phoenix/splash.png",
+      "bytes": 9853,
+      "sha256": "cdce00b1a868afd99b908b720a315b2f132ce9927807fda290fc0393349157cc"
+    },
+    {
+      "path": "sky-hop-app/icon-src/splash-android12-preview.png",
+      "bytes": 184220,
+      "sha256": "6c5d381a0ebe6147afcb0b09b8c37bd129c4fff2f60d989c33e62a58797501b5"
+    },
+    {
+      "path": "sky-hop-app/icon-src/x-m1.png",
+      "bytes": 526056,
+      "sha256": "45bdec4fd58182b7bfd786c06d644d4b1c8ed823cd3db0cdeea425038419cd59"
+    },
+    {
+      "path": "sky-hop-app/icon-src/x-prev1.png",
+      "bytes": 461214,
+      "sha256": "b2964863fd541ead56c00c1dcf95218c76a527b28318d6df203cf612bb81b46d"
+    },
+    {
+      "path": "sky-hop-app/icon-src/x-splash.png",
+      "bytes": 28389,
+      "sha256": "25253a1c1074ce56881c13564cb5e01cff9e2f072dc81b6ef422d9b86fb8c581"
+    },
+    {
+      "path": "sky-hop-app/package-lock.json",
+      "bytes": 41171,
+      "sha256": "6941e3184e21ada1bacc712aa2efcceb6adf2ef0d20c1222b88cdcddff53d87a"
+    },
+    {
+      "path": "sky-hop-app/package.json",
+      "bytes": 742,
+      "sha256": "85a741ebb11a5c3d458defde44e13d7c7da3a2f8684dc5adf75d0bae823a8714"
+    },
+    {
+      "path": "sky-hop-app/scripts/gen-icons-phoenix.py",
+      "bytes": 5882,
+      "sha256": "aeae8f1997ca685921ddc1bcec0e5a7f80b51e8f1ef4f2788f40a4722fa120ce"
+    },
+    {
+      "path": "sky-hop-app/scripts/gen-icons.py",
+      "bytes": 8717,
+      "sha256": "f69ff2fae30900f2783f45cb57ea3545d7a7812bcabc1372dc2acbb2f2261b59"
+    },
+    {
+      "path": "sky-hop-app/scripts/sync-web.js",
+      "bytes": 2613,
+      "sha256": "9ff4a6074baf71f7a23c124728e303024f69847086133ef6cd3511031c236501"
+    }
+  ],
+  "scan": "No unresolved heuristic credential matches; signing instructions omitted."
+}

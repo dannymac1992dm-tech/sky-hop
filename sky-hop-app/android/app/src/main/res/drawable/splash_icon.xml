@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ system splash icon (Theme.SplashScreen windowSplashScreenAnimatedIcon).
+     288dp box, system masks to a 192dp circle: white disc + round Sky Hop art. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp">
+    <item android:width="192dp" android:height="192dp" android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+    <item android:width="176dp" android:height="176dp" android:gravity="center"
+        android:drawable="@drawable/splash_icon_art" />
+</layer-list>

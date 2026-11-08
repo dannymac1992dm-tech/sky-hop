@@ -1,0 +1,9 @@
+# 1.18-candidate, second round (current):
+7d6ea3ad9fb24faea44ace6f5134a6631531dced611d62a444518f91be0b878f  skyhop-release-v1.18b-code22-candidate.aab
+bbc2473625b4b5b85537b5d3ea58fac93290ffab6ec69ef1b42233404a86818e  sky-hop-web-1.18b-candidate.zip
+# first 1.18 round (kept, also in /workspace/skyhop-1.18-baseline/):
+fd616ccaf78bad332ded4f71bdeddc6133e20ba963bfd6d168b149d5081e7153  skyhop-release-v1.18-code22-candidate.aab
+0e10507a59b20d99a4142b4b095678b16e5d7244e01919a5a932c707ef025433  sky-hop-web-1.18-candidate.zip
+# unchanged, protected (1.17 in review):
+645bea1424cc8ab906fbe57be726e572ed58f98d58f7fd7694ba0fee4ba59aad  skyhop-release-v1.17-code21-candidate.aab
+d16f402da74cf98efa30e9b7a3656e887a32d8b3c811b9de0ce8549518169c14  sky-hop-web-1.17-candidate.zip
