@@ -3829,13 +3829,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     puPipesSince++;
     puRunPipes++;
     let kind = POWERUP_INFO[puForceKind] ? puForceKind : null; // unknown / retired kinds are ignored
+    // A running helper blocks the next helper offer until that helper is fully gone (no pellets, rockets, toys, or zaps left).
+    const helperLive = weaponNow().length > 0;
     // v1.18 pity timer: when the helper clock runs out, the next free pipe carries the least-recently-seen helper pickup (never on top of another pickup / ride / boss window)
-    if (!kind && !wpnHoldOn && wpnClock >= wpnDue && !powerups.length && !puMode) { const wk = wpnPick(); if (wk) kind = wk; }
+    if (!kind && !helperLive && !wpnHoldOn && wpnClock >= wpnDue && !powerups.length && !puMode) { const wk = wpnPick(); if (wk) kind = wk; }
     if (!kind && magClock >= MAG_DUE && !powerups.length && !puMode && puMagnetFrames <= 0 && (wpnHoldOn || wpnClock < wpnDue - 150)) kind = "magnet";
     // v1.16: guarantee the first Rocket Boost / Spaceship of a run (needs a free slot: no pickup on screen, no ride mode active)
     if (!kind && !puRideSeen && puRunPipes >= PU_GUARANTEE_PIPES && level >= PU_MIN_LEVEL && !powerups.length && !puMode) kind = Math.random() < 0.5 ? "rocket" : "ship";
     // v1.17: guaranteed first Pellet Burst (about run pipe 12) and first Rocket Pop (by about pipe 20, level 3+); never on a boss level or the level before one
-    if (!kind && !wpnHoldOn && !powerups.length && burstSpawnOk() && (wpnSeq === 0 || wpnClock >= 150)) {
+    if (!kind && !helperLive && !wpnHoldOn && !powerups.length && burstSpawnOk() && (wpnSeq === 0 || wpnClock >= 150)) {
       if (!puPelletSeen && puRunPipes >= PU_PELLET_GUARANTEE_PIPES) kind = "pellet";
       else if (!puPopSeen && puRunPipes >= PU_POP_GUARANTEE_PIPES && !puMode && burstSpawnOk(3)) kind = "pop";
       else if (!puPoofSeen && level >= PU_POOF_MIN_LEVEL && puRunPipes >= PU_POOF_GUARANTEE_PIPES && burstSpawnOk(PU_POOF_MIN_LEVEL)) kind = "poof";
@@ -11541,6 +11543,52 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ridingNow: function () { return puMode ? 1 : 0; },
       puList: function () { return powerups.map(function (q) { if (!q.__id) q.__id = (window.__puSeq = (window.__puSeq || 0) + 1); return { id: q.__id, k: q.kind, x: q.x, y: q.y }; }); },
       wpnInfo: function (clear) { const o = { clock: wpnClock, due: wpnDue, t: wpnT, run: wpnRun, log: wpnLog.slice() }; if (clear) wpnLog.length = 0; return o; },
+      helperSpacingProbe: function () {
+        debugAuto = true;
+        startPlay();
+        const prev = score; score = 5 * PIPES_PER_LEVEL; onScoreChanged(prev);
+        wpnLog.length = 0;
+        let guard = 0, offer = null;
+        while (!offer && guard < 6000) {
+          for (let i = powerups.length - 1; i >= 0; i--) if (!WPN_MIN_LV[powerups[i].kind]) powerups.splice(i, 1);
+          invulnFrames = 8;
+          update();
+          guard++;
+          if (state !== State.PLAY) return { ok: false, reason: "run ended before a helper offer", state: state, guard: guard };
+          for (let i = 0; i < powerups.length; i++) if (WPN_MIN_LV[powerups[i].kind]) { offer = powerups[i]; break; }
+        }
+        if (!offer) return { ok: false, reason: "no helper offer", guard: guard, log: wpnLog.slice() };
+        const offered = offer.kind;
+        bird.x = offer.x; bird.y = offer.y; bird.vy = 0;
+        updatePowerups();
+        const active = weaponNow().slice();
+        if (active.length !== 1 || active[0] !== offered) return { ok: false, reason: "collect did not start that helper", offered: offered, active: active };
+        wpnLog.length = 0;
+        let steps = 0;
+        const spawnedWhile = [];
+        while (weaponNow().length && steps < 5000) {
+          invulnFrames = 8;
+          update();
+          steps++;
+          if (state !== State.PLAY) return { ok: false, reason: "run ended while helper active", steps: steps };
+          for (let i = 0; i < wpnLog.length; i++) if (wpnLog[i].ev === "spawn" && WPN_MIN_LV[wpnLog[i].kind]) spawnedWhile.push(wpnLog[i].kind);
+        }
+        if (weaponNow().length) return { ok: false, reason: "helper did not end", steps: steps, active: weaponNow() };
+        const endedAt = wpnT;
+        wpnLog.length = 0;
+        let after = 0, next = null;
+        while (!next && after < 900) {
+          for (let i = powerups.length - 1; i >= 0; i--) if (!WPN_MIN_LV[powerups[i].kind]) powerups.splice(i, 1);
+          invulnFrames = 8;
+          update();
+          after++;
+          if (state !== State.PLAY) return { ok: false, reason: "run ended while waiting for next helper", after: after };
+          for (let i = 0; i < wpnLog.length; i++) if (wpnLog[i].ev === "spawn" && WPN_MIN_LV[wpnLog[i].kind]) { next = wpnLog[i]; break; }
+        }
+        debugAuto = false;
+        const gap = next ? next.t - endedAt : null;
+        return { ok: spawnedWhile.length === 0 && gap !== null && gap >= WPN_AFTER_MIN - 2, offered: offered, active: active, stepsWhile: steps, spawnedWhile: spawnedWhile, framesAfterEnd: gap, nextKind: next && next.kind, afterMin: WPN_AFTER_MIN, afterMax: WPN_AFTER_MAX };
+      },
       puGap: function () { return PU_MIN_GAP_PIPES - pk().puGapCut; },
       addCoinAt: function (x, y, risky) { coins.push({ x: x, y: y, value: 1, risky: !!risky, spin: 0, pulled: false, pipe: null, dx: 0, gy: 0 }); },
       clearCoinsFn: clearCoins,

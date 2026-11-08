@@ -22,7 +22,8 @@ Built on the supplied 1.20 source (versionCode 24, versionName was `1.20-candida
 Browser play (`?debug=1`, Chrome) 0 gameplay failures:
 - Live levels 1, 100, 1,000, 5,000, 10,000 spawned compact clusters, not columns. Bird radius stayed 16 through all 40 stages. Drawn size stayed within about 8% of the starter.
 - Corridor center did not collide; obstacle centers did. A hit cracked; further hits crumbled.
-- Collecting a second helper replaced the first. Magnet radius was 0 until a Magnet was collected, then 130, then 0 again.
+- Magnet radius was 0 until a Magnet was collected, then 130, then 0 again.
+- Helper auto-spawn was measured on the live clock, not by forcing a second collect. A Rocket Pop offer was collected through the normal pickup path. While it was running (3600 frames, until the pop was fully gone) the spawn log recorded 0 helper offers. The next helper (Pellet Burst) was offered 296 frames after that pop ended. That is the 2.5–3.5 s post-end timer (150–210 frames) plus the wait until the next gate, which is what carries the offer. The earlier “second helper replaced the first” check was a forced `grantPU` call. That path still clears a different helper if one is granted directly. Auto-spawn does not offer that replacement while a helper is active. The spawn function now also refuses a helper kind while `weaponNow()` is non-empty, so the first-offer guarantee cannot bypass the clock.
 - Autopilot on a live level kept playing and scored. 240 simulation frames took 3.9 ms in that headless loop (simulation only; the screenshot frames are separate full draws).
 
 Screenshots in the review artifacts are frames from that running canvas, bird at normal play size.
