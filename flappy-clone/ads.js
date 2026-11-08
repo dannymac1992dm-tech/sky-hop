@@ -89,8 +89,8 @@
 (function (global) {
   "use strict";
 
-  const APP_VERSION = "1.17-candidate";
-  const APP_BUILD = 19;
+  const APP_VERSION = "1.21";
+  const APP_BUILD = 25;
 
   // —— Google official test ad unit IDs (Android) ——
   // https://developers.google.com/admob/android/test-ads

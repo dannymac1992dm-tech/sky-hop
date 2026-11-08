@@ -13,6 +13,7 @@ const COPY_FILES = [
   'index.html',
   'style.css',
   'game.js',
+  'obstacles.js',
   'ads.js',
   'sky-hop.html',
 ];
@@ -63,7 +64,7 @@ function main() {
       console.log(`[sync:web] excluded ${ent.name}`);
       continue;
     }
-    if (ent.name === 'node_modules' || ent.name === 'package.json' || ent.name === 'package-lock.json') continue;
+    if (ent.name === 'node_modules' || ent.name === 'package.json' || ent.name === 'package-lock.json' || ent.name === 'tests') continue;
     const from = path.join(SRC, ent.name);
     const to = path.join(DEST, ent.name);
     if (ent.isDirectory()) {
