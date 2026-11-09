@@ -274,6 +274,23 @@
     return { index: index, step: step, pattern: index >= 80 && step === 17 ? "ring" : "gateway", role: "reward", cue: step === 17 ? "Bonus gate" : null, gapAdd: 8, critter: false };
   }
 
+  /**
+   * Flight heading for the same 20-gate cycle.
+   * 0–7 east (side-scroll, includes the first challenge), 8–10 bank north,
+   * 11–16 climb toward the realm landmark, 17–19 level back to east.
+   * ang is the heading the camera eases toward. 0 is east, -PI/2 is north.
+   */
+  function flightLeg(index) {
+    index = Math.max(0, index | 0);
+    var step = index % 20;
+    var dir, turn, cue, ang;
+    if (step < 8) { dir = "east"; turn = null; cue = null; ang = 0; }
+    else if (step < 11) { dir = "turn"; turn = "north"; cue = step === 8 ? "Banking north" : null; ang = -Math.PI / 2; }
+    else if (step < 17) { dir = "north"; turn = null; cue = step === 11 ? "Climbing" : null; ang = -Math.PI / 2; }
+    else { dir = "turn"; turn = "east"; cue = step === 17 ? "Leveling out" : null; ang = 0; }
+    return { index: index, step: step, dir: dir, turn: turn, cue: cue, ang: ang };
+  }
+
   function layoutGate(opts) {
     var level = Math.max(1, opts.level | 0);
     var rng = opts.rng || mulberry((level * 100003 + (opts.serial | 0) * 9973 + 17) >>> 0);
@@ -452,6 +469,7 @@
     poolFor: poolFor,
     pickPattern: pickPattern,
     beatFor: beatFor,
+    flightLeg: flightLeg,
     BEAT_CUES: BEAT_CUES
   };
 })(typeof window !== "undefined" ? window : globalThis);

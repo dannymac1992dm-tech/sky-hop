@@ -2110,6 +2110,9 @@
   let nextSpawn = 0;
   let gateSerial = 0;
   let runGate = 0;
+  let viewAng = 0;       // 0 east, -PI/2 north. Eased. Physics stay in course space.
+  let flightLock = null; // debug: hold a heading for a screenshot
+  let flightCueAt = -1;
   let recoveryExtra = 0;
 
   // —— Extras world entities ——
@@ -6150,6 +6153,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shopToastText = "⚑ Continuing from Level " + formatLevel(level) + " checkpoint";
     }
     runGate = 0;
+    viewAng = 0;
+    flightLock = null;
+    flightCueAt = -1;
     recoveryExtra = 0;
     heldWeapon = null;
     weaponFiring = false; keyFire = false; fireIds.clear(); fireCd = 0;
@@ -7250,7 +7256,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const gi = runGate++;
     const bossGate = np.style === "boss";
     const preview = bossGate ? null : O.beatFor(gi);
+    const leg = bossGate || !O.flightLeg ? null : O.flightLeg(gi);
     let gapAdd = preview ? preview.gapAdd : 0;
+    if (leg && leg.dir === "turn") gapAdd += 30;
     if (preview && E.hasMastery(save, "calm") && preview.role === "challenge" && preview.cue) gapAdd = 22;
     if (recoveryExtra > 0 && preview && preview.role === "recovery") { gapAdd += 14; recoveryExtra--; }
     if (gapAdd) np.gap += gapAdd;
@@ -7272,7 +7280,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     np.bits = built.bits;
     np.beatRole = built.beat ? built.beat.role : "";
     np.beatCue = built.beat && built.beat.cue;
-    if (np.beatCue) showBigBanner(np.beatCue, np.beatRole === "challenge" ? "Short section" : "Easy stretch", np.beatRole === "reward" ? "#ffe08a" : "#ffffff");
+    np.gateIndex = gi;
+    np.flightDir = leg ? leg.dir : "east";
+    if (leg && leg.cue) {
+      const sub = np.beatCue || (leg.turn === "north" ? "The path bends upward" : leg.dir === "north" ? "Landmark ahead" : "The path levels out");
+      showBigBanner(leg.cue, sub, "#ffe7b0");
+    }
+    else if (np.beatCue) showBigBanner(np.beatCue, np.beatRole === "challenge" ? "Short section" : "Easy stretch", np.beatRole === "reward" ? "#ffe08a" : "#ffffff");
     np.pattern = built.pattern;
     np.fam = built.family;
     np.families = built.families;
@@ -7618,6 +7632,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
 
     // PLAY
+    tickFlight();
     tickPuMode();
     const perkGrav = pk().gravMul; // Hummingbird Tight Hover (1 = unchanged)
     let g = GRAVITY * perkGrav;
@@ -11619,6 +11634,129 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx = prev;
   }
 
+  function northAmt() {
+    return Math.max(0, Math.min(1, -viewAng / (Math.PI / 2)));
+  }
+  function tickFlight() {
+    if (flightLock != null) { viewAng = flightLock; return; }
+    const O = window.SkyHopObstacles;
+    if (!O || !O.flightLeg) return;
+    let gi = runGate;
+    for (let i = 0; i < pipes.length; i++) {
+      if (!pipes[i].scored && pipes[i].gateIndex != null) { gi = pipes[i].gateIndex; break; }
+    }
+    const leg = O.flightLeg(gi);
+    const target = leg.ang;
+    viewAng += (target - viewAng) * 0.045;
+    if (Math.abs(target - viewAng) < 0.004) viewAng = target;
+  }
+  function applyCourseCamera() {
+    const k = northAmt();
+    const fit = W / PLAY_H;
+    const s = 1 + (fit - 1) * k;
+    const psx = bird.x + (W * 0.5 - bird.x) * k;
+    const psy = bird.y + (PLAY_H * 0.70 - bird.y) * k;
+    ctx.translate(psx, psy);
+    ctx.rotate(viewAng);
+    ctx.scale(s, s);
+    ctx.translate(-bird.x, -bird.y);
+  }
+  const MARK = {
+    day: ["Ember Citadel", "#ffb15a", "#6a2844"],
+    desert: ["Sun Arch", "#ffe0a0", "#c46a32"],
+    snow: ["Glass Peak", "#f4fbff", "#7aa0c8"],
+    city: ["Beacon Spire", "#7fe7ff", "#ffd86b"],
+    space: ["Ring Station", "#ffb07a", "#9a7cff"],
+    blossom: ["Lantern Gate", "#ffb0c8", "#6a3048"],
+    reef: ["Coral Crown", "#ff8aa4", "#3fbf8f"],
+    volcano: ["Caldera Mouth", "#ff6a1a", "#ffd25a"],
+    candy: ["Aurora Spire", "#c49bff", "#7ec8ff"]
+  };
+  function landmarkGrow() {
+    const worldT = ((Math.max(1, level) - 1) % 20) / 19;
+    return 0.36 + 0.78 * Math.max(worldT * 0.42, northAmt());
+  }
+  function drawLandmark() {
+    const d = worldDefAt(state === State.START ? 0 : worldIdx);
+    const spec = MARK[d.id] || MARK.day;
+    const g = state === State.START ? 0.72 : Math.max(0.7, landmarkGrow());
+    const y = 168;
+    ctx.save();
+    ctx.translate(W / 2, y);
+    ctx.scale(g, g);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(0, 26, 18, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = spec[2];
+    ctx.beginPath();
+    ctx.moveTo(0, -36); ctx.lineTo(14, 6); ctx.lineTo(5, 6); ctx.lineTo(5, 20); ctx.lineTo(-5, 20); ctx.lineTo(-5, 6); ctx.lineTo(-14, 6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = spec[1];
+    ctx.beginPath(); ctx.arc(0, -6, 4.5, 0, Math.PI * 2); ctx.fill();
+    if (d.id === "space") {
+      ctx.strokeStyle = spec[1]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 2, 20, 6, -0.45, 0, Math.PI * 2); ctx.stroke();
+    } else if (d.id === "city") {
+      ctx.fillStyle = "#14182c";
+      ctx.fillRect(-16, 8, 10, 16); ctx.fillRect(6, 4, 10, 20);
+      ctx.fillStyle = "#ffd86b"; ctx.fillRect(-13, 12, 3, 3); ctx.fillRect(9, 10, 3, 3);
+    } else if (d.id === "snow") {
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.moveTo(0, -42); ctx.lineTo(16, 4); ctx.lineTo(-16, 4); ctx.closePath(); ctx.fill();
+    } else if (d.id === "reef") {
+      ctx.strokeStyle = "#3fbf8f"; ctx.lineWidth = 3; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-12, 18); ctx.quadraticCurveTo(-4, -8, 0, 10); ctx.moveTo(2, 16); ctx.quadraticCurveTo(10, -12, 14, 12); ctx.stroke();
+    } else if (d.id === "volcano") {
+      ctx.fillStyle = "#ff6a1a";
+      ctx.beginPath(); ctx.moveTo(-3, -18); ctx.lineTo(3, -18); ctx.lineTo(0, -4); ctx.closePath(); ctx.fill();
+    } else if (d.id === "blossom") {
+      ctx.fillStyle = "#ffb0c8"; ctx.beginPath(); ctx.arc(0, -30, 6, 0, Math.PI * 2); ctx.fill();
+    } else if (d.id === "desert") {
+      ctx.strokeStyle = "#ffe0a0"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 4, 16, Math.PI, 0); ctx.stroke();
+    } else if (d.id === "candy") {
+      ctx.fillStyle = "#7ec8ff";
+      ctx.beginPath(); ctx.moveTo(0, -44); ctx.lineTo(7, -26); ctx.lineTo(0, -20); ctx.lineTo(-7, -26); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    if (state === State.PLAY && northAmt() > 0.4) {
+      ctx.fillStyle = "rgba(255,231,176,0.95)";
+      ctx.font = "bold 12px " + FONT;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(spec[0], W / 2, y + 24 * g + 6);
+    }
+  }
+  function drawCourseRail() {
+    const k = northAmt();
+    if (k < 0.12) return;
+    ctx.globalAlpha = k * 0.9;
+    ctx.fillStyle = "#1a1014";
+    ctx.fillRect(-80, -8, W + 400, 18);
+    ctx.globalAlpha = 1;
+  }
+  function drawFlightChip() {
+    if (state !== State.PLAY) return;
+    const O = window.SkyHopObstacles;
+    if (!O || !O.flightLeg) return;
+    let gi = runGate;
+    for (let i = 0; i < pipes.length; i++) if (!pipes[i].scored && pipes[i].gateIndex != null) { gi = pipes[i].gateIndex; break; }
+    const leg = O.flightLeg(gi);
+    let label = "Cruising";
+    if (northAmt() > 0.82) label = "Climbing";
+    else if (northAmt() > 0.12) label = leg.ang < -0.4 ? "Banking north" : "Leveling out";
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "rgba(12,8,14,0.62)";
+    roundRect(W / 2 - 58, 118, 116, 18, 9);
+    ctx.fill();
+    ctx.fillStyle = "#ffe7b0";
+    ctx.font = "bold 11px " + FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, W / 2, 127);
+    ctx.restore();
+  }
+
   function render() {
     ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     if (warmedAt !== renderScale) {
@@ -11652,6 +11790,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state === State.START && (worldIdx !== 0 || bossOn)) syncWorld(false);
     drawWorldSky();
     drawWorldWeather();
+    drawLandmark();
+    const by = bird.y;
+    if (playing && skillActive("dash") <= 0) bird.y = by + bird.vy * renderAlpha;
+    ctx.save();
+    applyCourseCamera();
+    drawCourseRail();
+    drawWorldGround();
     ctx.save();
     if (shiftX) ctx.translate(-shiftX, 0);
     drawWorldExtras("bg");
@@ -11659,24 +11804,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state !== State.START) { drawCoins(); drawPowerups(); drawPathfinder(); drawBlackHoles(); drawShipRockets(); }
     drawWorldExtras("fg");
     drawBurstFx(); drawPuPop();
+    if (state === State.START) drawBird();
+    else { drawPuModeBack(); drawBird(); drawWarpFlash(); }
+    drawParticles();
     ctx.restore();
-    drawWorldGround();
+    ctx.restore();
+    bird.y = by;
     drawBossOverlay();
 
     if (state === State.START) {
-      drawBird();
       drawStart();
       drawStreakPopup();
     } else {
-      // Extrapolate the bird's vertical motion by the same fraction of a step
-      const by = bird.y;
-      if (playing && skillActive("dash") <= 0) bird.y = by + bird.vy * renderAlpha;
-      drawPuModeBack();
-      drawBird();
-      bird.y = by;
-      drawWarpFlash();
       drawFx();
       drawScoreHUD();
+      drawFlightChip();
       // Skill HUD + skill toasts only while playing (never on OVER/START)
       if (state === State.PLAY) {
         drawFireButton();
@@ -11697,7 +11839,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
     }
 
-    drawParticles();
     drawFlash();
     if (shakeOn) ctx.restore();
     drawPauseUi();
@@ -11970,6 +12111,22 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       pipeGap112: function () { return pipeGap; },
       freeze112: function (on) { freeze112 = !!on; },
       redraw: function () { render(); },
+      headingInfo: function () {
+        const O = window.SkyHopObstacles;
+        let gi = runGate;
+        for (let i = 0; i < pipes.length; i++) if (!pipes[i].scored && pipes[i].gateIndex != null) { gi = pipes[i].gateIndex; break; }
+        const leg = O && O.flightLeg ? O.flightLeg(gi) : null;
+        return { ang: +viewAng.toFixed(3), north: +northAmt().toFixed(3), gi: gi, leg: leg, lock: flightLock };
+      },
+      clearMoment: function () { evoMoment = null; bigBannerT = 0; shopToast = 0; shopToastText = ""; },
+      setFlight: function (mode) {
+        if (mode === "north") flightLock = -Math.PI / 2;
+        else if (mode === "turn") flightLock = -Math.PI / 4;
+        else if (mode === "east") flightLock = 0;
+        else flightLock = null;
+        if (flightLock != null) viewAng = flightLock;
+        return flightLock;
+      },
       pauseGame: function (r) { return pauseGame(r || "debug"); },
       resumeGame: function () { return resumeGame(); },
       pauseInfo: function () { return { mode: pauseMode, count: pauseCount, quitArmed: pauseQuitArmed, btn: PAUSE_BTN, resume: PAUSE_RESUME, quit: PAUSE_QUIT }; },

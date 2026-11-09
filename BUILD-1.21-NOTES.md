@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 28) — not uploaded
+
+versionName stays 1.21. versionCode 28. Nothing here is uploaded.
+
+## Mixed headings
+The same 20-gate cycle now also turns the camera. Gates 0–7 cruise east. Gates 8–10 bank north. Gates 11–16 climb toward that realm's landmark. Gates 17–19 level back to east. Tap still pushes against the same drift; the camera turns that drift onto the screen. Shots travel forward in course space, so they leave toward the right while cruising and toward the landmark while climbing. A continue starts level, facing east. Turn gates are wider.
+
 # Sky Hop 1.21 revised test build (versionCode 27) — not uploaded
 
 versionName stays 1.21. versionCode 27 replaces the code 26 packages. Nothing here is uploaded.
