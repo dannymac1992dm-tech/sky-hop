@@ -90,7 +90,7 @@
   "use strict";
 
   const APP_VERSION = "1.21";
-  const APP_BUILD = 25;
+  const APP_BUILD = 26;
 
   // —— Google official test ad unit IDs (Android) ——
   // https://developers.google.com/admob/android/test-ads

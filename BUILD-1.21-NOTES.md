@@ -1,4 +1,17 @@
-# Sky Hop 1.21 (versionCode 25) — playable test build, not uploaded
+# Sky Hop 1.21 revised test build (versionCode 26) — not uploaded
+
+Same user-facing version 1.21. versionCode moved from 25 to 26 because 25 was already built. Nothing here is a Play submission.
+
+## This revision
+- A new run starts on the Hatchling. The form is earned again as that run's level rises. Save & Continue restores the form for the saved level. Permanent stage rewards, coins, and the skill tree are not cleared. Older checkpoint saves without a stored form use the saved level.
+- Pellet Burst, Rocket Pop, Zap Wand, and Poof Toy are stored when picked up. A separate Use control (on-screen button, or F) spends them only while held down, so one finger can still flap. Unused time and counts do not tick down. The next burst is not offered until the stored one and its leftover shots are gone. Magnet, shield, and ride pickups are unchanged and do not clear a stored burst.
+- Obstacles follow a 20-gate cycle: easy stretch, a short named section (Drift, Rise and fall, Turning, Weave, Three across, Steady), another easy stretch, then a second section and a bonus gate. The first named section is obstacle 6, during level 1. Clean bonus gates pay a few earned coins. Sections stay inside the existing gap rules. No tall columns were added.
+- After the bird form is finished (level 1000, about obstacle 4995), five free mastery unlocks change play: Calm Entry at level 800 (about obstacle 3995), Reserve at 1500 (7495), Second Glance at 3000 (14995), Keen Eye at 5000 (24995), Anchor at 8000 (39995). Level 10000 is about obstacle 49995. Obstacle counts here are `(level - 1) * 5` gates.
+
+## Content note for Legal
+Witch hunters are still the same humanoid silhouettes. This revision does not redesign them. Burst effects are still cartoon pellets, flames, lightning, and confetti, with no blood. Clearance to ship is unchanged.
+
+# Sky Hop 1.21 (versionCode 25) — earlier test build, not uploaded
 
 Local test release only. No Play upload, no site deploy, no store-listing change.
 

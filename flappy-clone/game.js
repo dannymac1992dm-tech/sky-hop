@@ -572,7 +572,12 @@
     return { tier: tier, idx: tier, prestige: 0, id: base.id, name: base.name, accent: base.accent, feel: base.feel, palette: base.palette, glow: null };
   }
   /** The bird's stage (0..19) is permanent progress (levels reached); the palette helpers take it as stage * 10. */
-  function evoPipes() { return Math.max(0, Math.min(39, (save && save.evo) | 0)) * 10; }
+  let runEvo = 0; // form shown in this run. A new run starts at the first form. A checkpoint restore uses the saved level.
+  function evoPipes() {
+    let st = runEvo | 0;
+    if (state !== State.PLAY && state !== State.OVER) st = resumeRec && resumeRec.level ? E.evoStageForLevel(resumeRec.level) : 0;
+    return Math.max(0, Math.min(39, st)) * 10;
+  }
 
   function mixHex(a, b, t) {
     if (!a || !b || t <= 0) return a || b;
@@ -2105,6 +2110,8 @@
   let gapMargin = BASE_GAP_MARGIN;
   let nextSpawn = 0;
   let gateSerial = 0;
+  let runGate = 0;
+  let recoveryExtra = 0;
 
   // —— Extras world entities ——
   const trees = [];       // bg/fg scenery + trunk obstacles
@@ -2553,6 +2560,10 @@
   let evoMoment = null;
   function checkEvolution() {
     const got = E.evoSync(save, Math.max(level, peakLevel()));
+    const form = E.evoStageForLevel(level);
+    if (form > runEvo) { runEvo = form; palMemo.r = null; if (!evoMoment) evoMoment = { t: 140, stage: form, name: E.EVO_NAMES[form], rewards: [], pal: null }; }
+    const mastered = E.masterySync(save, Math.max(level, peakLevel()));
+    if (mastered.length && state === State.PLAY) showBigBanner(mastered[mastered.length - 1].name, mastered[mastered.length - 1].text, "#ffe08a");
     if (!got.length) return;
     persist();
     palMemo.r = null;
@@ -2747,6 +2758,13 @@
     if (scoreMult >= 2) add += 1;
     if (scoreMult >= 2.5) add += 1;
     if (nearMiss) add += 0; // sparkle only — no streak bonus
+    if (p.beatRole === "challenge" && nearMiss && E.hasMastery(save, "glance")) recoveryExtra = Math.max(recoveryExtra, 2);
+    if (p.beatRole === "reward" && !nearMiss && state === State.PLAY) {
+      const bonus = E.hasMastery(save, "keen") ? 8 : 3;
+      const gained = E.addCoins(save, bonus);
+      runCoins += gained;
+      floaters.push({ x: bird.x, y: bird.y - 28, text: "Clean gate +" + gained, life: 50, color: "#ffe08a" });
+    }
     const prevScore = score;
     score += add;
     scorePop = 1.15;
@@ -3366,6 +3384,57 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (kind !== "zap") bolts.length = 0;
   }
   function weaponNow() { const o = []; if (pelletFrames > 0 || pellets.length) o.push("pellet"); if (popQueue > 0 || popRockets.length) o.push("pop"); if (poofQueue > 0 || toys.length) o.push("poof"); if (zapQueue > 0 || zaps.length) o.push("zap"); return o; }
+  let heldWeapon = null; // { kind, ammo, max } stored until the player holds Use. Ammo does not fall while it is waiting.
+  let weaponFiring = false, keyFire = false, fireCd = 0;
+  const fireIds = new Set();
+  const FIRE_BTN = { x: 36, y: 470, r: 26, hit: 40 };
+  const WPN_LABEL = { pellet: "Pellet Burst", pop: "Rocket Pop", zap: "Zap Wand", poof: "Poof Toy" };
+  function weaponOccupied() { return !!(heldWeapon && heldWeapon.ammo > 0) || weaponNow().length > 0; }
+  function ammoPack(kind) {
+    const reserve = E.hasMastery(save, "reserve");
+    if (kind === "pellet") return Math.round((PELLET_FRAMES + pk().pelletFrames) * (reserve ? 1.25 : 1));
+    if (kind === "pop") return POP_ROCKETS + pk().popExtra + (reserve ? 5 : 0);
+    if (kind === "zap") return ZAP_BASE + (reserve ? 3 : 0);
+    if (kind === "poof") return POOF_BASE_TOYS + pk().poofExtra + (reserve ? 2 : 0);
+    return 0;
+  }
+  function storeWeapon(kind) {
+    if (!WPN_LABEL[kind] || weaponOccupied()) return false;
+    const n = ammoPack(kind);
+    heldWeapon = { kind: kind, ammo: n, max: n };
+    fireCd = 0;
+    burstBanner = { text: WPN_LABEL[kind] + " ready", life: 80, color: (POWERUP_INFO[kind] && POWERUP_INFO[kind].color) || "#fff" };
+    return true;
+  }
+  function refreshFiring() { weaponFiring = fireIds.size > 0 || keyFire; }
+  function fireHit(pt) {
+    if (!pt || !heldWeapon || heldWeapon.ammo <= 0) return false;
+    const dx = pt.x - FIRE_BTN.x, dy = pt.y - FIRE_BTN.y;
+    return dx * dx + dy * dy <= FIRE_BTN.hit * FIRE_BTN.hit;
+  }
+  function tickHeldFire() {
+    if (!heldWeapon || heldWeapon.ammo <= 0) { if (heldWeapon && heldWeapon.ammo <= 0) heldWeapon = null; return; }
+    if (!weaponFiring || state !== State.PLAY || pauseMode) return;
+    const k = heldWeapon.kind;
+    if (k === "pellet") {
+      heldWeapon.ammo--;
+      if (fireCd <= 0) { firePellet(); fireCd = Math.max(2, PELLET_EVERY - pk().pelletCut); }
+      else fireCd--;
+    } else if (fireCd > 0) fireCd--;
+    else if (k === "pop") {
+      if (launchPopRocket(0)) { heldWeapon.ammo--; fireCd = Math.max(6, POP_EVERY - pk().rocketCut); }
+      else fireCd = 6;
+    } else if (k === "zap") {
+      zapStrike(zapTarget());
+      heldWeapon.ammo--;
+      fireCd = ZAP_EVERY;
+    } else if (k === "poof") {
+      tossToy(poofTarget());
+      heldWeapon.ammo--;
+      fireCd = Math.max(18, POOF_EVERY - pk().poofCut);
+    }
+    if (heldWeapon && heldWeapon.ammo <= 0) { heldWeapon = null; weaponFiring = false; keyFire = false; fireIds.clear(); fireCd = 0; }
+  }
   function startPelletBurst() { clearOthers("pellet"); burstBanner = { text: "Pellet Burst!", life: 80, color: "#ff2d8a" }; const add = PELLET_FRAMES + pk().pelletFrames; pelletFrames = Math.min(pelletFrames + add, add * STACK_MAX); pelletTotal = Math.max(pelletFrames, 1); if (pelletCd < 0) pelletCd = 0; sweep(700, 1200, 0.2, "triangle", 0.03); }   // v1.18: a new pickup extends the burst (up to 2x)
   function startRocketPop() { clearOthers("pop"); burstBanner = { text: "Rocket Pop!", life: 80, color: "#7a4cff" }; const add = POP_ROCKETS + pk().popExtra; if (popQueue <= 0) { popLaunched = 0; popCd = 0; } popQueue = Math.min(popQueue + add, add * STACK_MAX); popTotal = Math.max(popQueue, 1); popHold = POP_HOLD; sweep(300, 760, 0.25, "triangle", 0.035); }
   function hunterCover(h) {
@@ -3830,7 +3899,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     puRunPipes++;
     let kind = POWERUP_INFO[puForceKind] ? puForceKind : null; // unknown / retired kinds are ignored
     // A running helper blocks the next helper offer until that helper is fully gone (no pellets, rockets, toys, or zaps left).
-    const helperLive = weaponNow().length > 0;
+    const helperLive = weaponOccupied();
     // v1.18 pity timer: when the helper clock runs out, the next free pipe carries the least-recently-seen helper pickup (never on top of another pickup / ride / boss window)
     if (!kind && !helperLive && !wpnHoldOn && wpnClock >= wpnDue && !powerups.length && !puMode) { const wk = wpnPick(); if (wk) kind = wk; }
     if (!kind && magClock >= MAG_DUE && !powerups.length && !puMode && puMagnetFrames <= 0 && (wpnHoldOn || wpnClock < wpnDue - 150)) kind = "magnet";
@@ -3877,14 +3946,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     } else if (kind === "magnet") {
       puMagnetFrames = Math.round(PU_MAGNET_FRAMES * pk().magnetMul);
       sfxMagnet();
-    } else if (kind === "pellet") {
-      if (burstAllowed()) startPelletBurst();
-    } else if (kind === "pop") {
-      if (burstAllowed()) startRocketPop();
-    } else if (kind === "poof") {
-      if (burstAllowed()) startPoofToy();
-    } else if (kind === "zap") {
-      if (burstAllowed()) startZapWand();
+    } else if (kind === "pellet" || kind === "pop" || kind === "poof" || kind === "zap") {
+      if (burstAllowed()) storeWeapon(kind);
     } else if (PU_MODE_KINDS[kind]) {
       startPuMode(kind);
     }
@@ -4144,7 +4207,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function tickPowerupTimers() {
-    if (weaponNow().length) { wpnClock = 0; wpnDue = WPN_AFTER_MIN + Math.floor(Math.random() * (WPN_AFTER_MAX - WPN_AFTER_MIN + 1)); wpnBusyF++; } else if (!puMode) wpnClock++; wpnT++; if (puMagnetFrames <= 0) magClock++;   // a Rocket Boost / Spaceship ride is itself a power-up in progress: the helper clock waits for it to end
+    if (weaponOccupied()) { wpnClock = 0; wpnDue = WPN_AFTER_MIN + Math.floor(Math.random() * (WPN_AFTER_MAX - WPN_AFTER_MIN + 1)); wpnBusyF++; } else if (!puMode) wpnClock++; wpnT++; if (puMagnetFrames <= 0) magClock++;   // a stored or running burst, or a ride, holds the next burst offer
    
     if (puMagnetFrames > 0) puMagnetFrames--;
   }
@@ -5876,7 +5939,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   let resumeRec = loadResume(), newGameConfirm = 0, resumeQuit = false;
   function writeResume(r) { resumeRec = r; try { localStorage.setItem(RESUME_KEY, r ? JSON.stringify(r) : "null"); } catch (_) {} }   // tiny, only on level-up / pause / crash
   function snapshotRun(kind) {
-    return { v: 1, kind: kind, level: level, cp: runCheckpoint | 0, runCoins: runCoins | 0, pellet: Math.max(0, pelletFrames | 0), pop: Math.max(0, popQueue | 0), poof: Math.max(0, poofQueue | 0), zap: Math.max(0, zapQueue | 0), mag: Math.max(0, puMagnetFrames | 0), cont: !!continueUsedThisRun, t: Date.now() };
+    return { v: 1, kind: kind, level: level, cp: runCheckpoint | 0, runCoins: runCoins | 0, runEvo: E.evoStageForLevel(level), pellet: 0, pop: 0, poof: 0, zap: 0, mag: Math.max(0, puMagnetFrames | 0), held: heldWeapon && heldWeapon.ammo > 0 ? { k: heldWeapon.kind, a: heldWeapon.ammo | 0, m: heldWeapon.max | 0 } : null, cont: !!continueUsedThisRun, t: Date.now() };
   }
   function saveRunNow(kind) { if (state === State.PLAY) writeResume(snapshotRun(kind || "auto")); }
   function resumeRun() {
@@ -5885,8 +5948,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     startPlay({ checkpoint: r.level });
     runCheckpoint = r.cp | 0; checkpointUsedThisRun = false;
     runCoins = r.runCoins | 0; continueUsedThisRun = !!r.cont;
-    pelletFrames = r.pellet | 0; popQueue = r.pop | 0; poofQueue = r.poof | 0; zapQueue = r.zap | 0; puMagnetFrames = r.mag | 0;
-    if (popQueue > 0) { popLaunched = 0; popCd = 0; }
+    runEvo = r.runEvo != null ? Math.max(0, Math.min(39, r.runEvo | 0)) : E.evoStageForLevel(r.level);
+    palMemo.r = null;
+    heldWeapon = null; weaponFiring = false; keyFire = false; fireIds.clear();
+    if (r.held && (r.held.a | 0) > 0 && WPN_LABEL[r.held.k]) heldWeapon = { kind: r.held.k, ammo: r.held.a | 0, max: Math.max(r.held.a | 0, r.held.m | 0) };
+    else if ((r.pellet | 0) > 0) heldWeapon = { kind: "pellet", ammo: r.pellet | 0, max: r.pellet | 0 };
+    else if ((r.pop | 0) > 0) heldWeapon = { kind: "pop", ammo: r.pop | 0, max: r.pop | 0 };
+    else if ((r.zap | 0) > 0) heldWeapon = { kind: "zap", ammo: r.zap | 0, max: r.zap | 0 };
+    else if ((r.poof | 0) > 0) heldWeapon = { kind: "poof", ammo: r.poof | 0, max: r.poof | 0 };
+    pelletFrames = 0; popQueue = 0; poofQueue = 0; zapQueue = 0; puMagnetFrames = r.mag | 0;
     shopToastText = "▶ Continuing from Level " + formatLevel(level);
     pauseMode = 2; pauseCount = PAUSE_STEP * 3; pauseQuitArmed = false;   // 3-2-1 before the bird moves
     writeResume(snapshotRun("resume"));
@@ -5949,6 +6019,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shopToast = 1.4;
       shopToastText = "⚑ Continuing from Level " + formatLevel(level) + " checkpoint";
     }
+    runGate = 0;
+    recoveryExtra = 0;
+    heldWeapon = null;
+    weaponFiring = false; keyFire = false; fireIds.clear(); fireCd = 0;
+    runEvo = fromCheckpoint ? E.evoStageForLevel(level) : 0;
+    palMemo.r = null;
     state = State.PLAY;
     syncWorld(!!fromCheckpoint);
     setSongForWorld();
@@ -5976,7 +6052,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   /** The part of game over that banks the run (also used by Quit to menu on the pause screen). */
   function finishRun() {
     if (resumeQuit) resumeQuit = false;
-    else writeResume(runCheckpoint > 0 ? Object.assign(snapshotRun("crash"), { level: runCheckpoint, runCoins: 0, pellet: 0, pop: 0, poof: 0, zap: 0, mag: 0, cont: false }) : null);
+    else writeResume(runCheckpoint > 0 ? Object.assign(snapshotRun("crash"), { level: runCheckpoint, runEvo: E.evoStageForLevel(runCheckpoint), runCoins: 0, pellet: 0, pop: 0, poof: 0, zap: 0, mag: 0, held: null, cont: false }) : null);
     state = State.OVER;
     overTimer = 0;
     toasts.length = 0;
@@ -6722,19 +6798,26 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (isHudTarget(e.target)) return;
     e.preventDefault();
     canvasRectCache = canvas.getBoundingClientRect(); // fresh rect for every tap (see canvasToLocal)
-    // Multi-touch: handle every finger that just touched down (e.g. flap + skill at once)
-    if (e.changedTouches && e.changedTouches.length > 1 && state === State.PLAY) {
+    // Multi-touch: a finger on Use fires while another finger flaps.
+    if (e.changedTouches && e.changedTouches.length) {
       for (let i = 0; i < e.changedTouches.length; i++) {
-        handlePointerAt(canvasToLocal({ __pt: e.changedTouches[i] }));
+        const t = e.changedTouches[i];
+        const pt = canvasToLocal({ __pt: t });
+        if (state === State.PLAY && fireHit(pt)) { fireIds.add(t.identifier); refreshFiring(); }
+        else handlePointerAt(pt);
       }
       return;
     }
-    handlePointerAt(canvasToLocal(e));
+    const id = e.pointerId != null ? e.pointerId : "mouse";
+    const pt = canvasToLocal(e);
+    if (state === State.PLAY && fireHit(pt)) { fireIds.add(id); refreshFiring(); return; }
+    handlePointerAt(pt);
   }
 
   function handlePointerAt(pt) {
     if (pauseMode) { pausePointer(pt); return; }
     if (state === State.PLAY && pauseBtnHit(pt)) { pauseGame("button"); return; }
+    if (state === State.PLAY && fireHit(pt)) return;
     if (chestActive()) {
       if (rewardBusy || continueBusy) { abandonPendingAd(); return; }
       if (hitBtn(pt, uiButtons.chestDouble)) { requestChestDouble(); return; }
@@ -6908,7 +6991,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
 
-  function onPointerUp() {
+  function onPointerUp(e) {
+    if (e && e.changedTouches) {
+      for (let i = 0; i < e.changedTouches.length; i++) fireIds.delete(e.changedTouches[i].identifier);
+    } else if (e) fireIds.delete(e.pointerId != null ? e.pointerId : "mouse");
+    else fireIds.clear();
+    refreshFiring();
     trophyDragY = null;
     shopDragY = null;
   }
@@ -6962,6 +7050,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       return;
     }
     if (e.code === "KeyP" && !e.repeat && (state === State.PLAY || pauseMode)) { e.preventDefault(); if (pauseMode === 1) resumeGame(); else if (pauseMode === 2) { pauseMode = 1; pauseCount = 0; } else pauseGame("key"); return; }
+    if (e.code === "KeyF" && state === State.PLAY) { e.preventDefault(); keyFire = true; refreshFiring(); return; }
     if (e.code === "Space" || e.key === " " || e.code === "ArrowUp") {
       e.preventDefault();
       if (e.repeat) return;
@@ -6974,6 +7063,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (map[e.key]) useSkill(map[e.key]);
       else if (e.code === "ShiftLeft" || e.code === "ShiftRight" || e.code === "ArrowRight") useSkill("dash");
     }
+  });
+  window.addEventListener("keyup", (e) => {
+    if (e.code === "KeyF") { keyFire = false; refreshFiring(); }
   });
 
   function clampTrophyScroll() {
@@ -7022,13 +7114,24 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       stepPipeMotion(np, 0);
     }
     // v1.21: compact disconnected obstacles. Never a ceiling-floor column.
+    // A 20-obstacle cycle adds a challenge, a recovery stretch, and a bonus gate. The first challenge is obstacle 6.
     const O = window.SkyHopObstacles;
     const serial = gateSerial++;
+    const gi = runGate++;
+    const bossGate = np.style === "boss";
+    const preview = bossGate ? null : O.beatFor(gi);
+    let gapAdd = preview ? preview.gapAdd : 0;
+    if (preview && E.hasMastery(save, "calm") && preview.role === "challenge" && preview.cue) gapAdd = 22;
+    if (recoveryExtra > 0 && preview && preview.role === "recovery") { gapAdd += 14; recoveryExtra--; }
+    if (gapAdd) np.gap += gapAdd;
     const built = O.layoutGate({
       level: level,
       serial: serial,
+      gateIndex: bossGate ? null : gi,
+      calmEntry: !bossGate && E.hasMastery(save, "calm"),
+      ampScale: preview && preview.role === "challenge" && E.hasMastery(save, "anchor") ? 0.8 : 1,
       worldIndex: np.wi,
-      boss: np.style === "boss",
+      boss: bossGate,
       playH: PLAY_H,
       gap: np.gap,
       gapMin: np.bAmp ? Math.max(100, (np.gap0 || np.gap) - np.bAmp) : np.gap,
@@ -7037,6 +7140,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       rng: O.mulberry((level * 100003 + serial * 9973 + (np.wi | 0) * 17) >>> 0),
     });
     np.bits = built.bits;
+    np.beatRole = built.beat ? built.beat.role : "";
+    np.beatCue = built.beat && built.beat.cue;
+    if (np.beatCue) showBigBanner(np.beatCue, np.beatRole === "challenge" ? "Short section" : "Easy stretch", np.beatRole === "reward" ? "#ffe08a" : "#ffffff");
     np.pattern = built.pattern;
     np.fam = built.family;
     np.families = built.families;
@@ -7461,6 +7567,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     updatePowerups();
     updateBlackHoles();
     updateExtras();
+    tickHeldFire();
     updateBurstFx();
   }
 
@@ -9412,7 +9519,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       const toastA = toastAlpha();
       if (toastA < 0.99) {
         if (toastA > 0) ctx.globalAlpha = 1 - toastA;
-        if (hudFormFor !== save.evo) { hudFormFor = save.evo; hudFormLabel = "Stage " + (save.evo + 1) + "/" + E.EVO_LEVELS.length + " · " + E.EVO_NAMES[save.evo]; }
+        if (hudFormFor !== runEvo) { hudFormFor = runEvo; hudFormLabel = "Stage " + (runEvo + 1) + "/" + E.EVO_LEVELS.length + " · " + E.EVO_NAMES[runEvo]; }
         const label = hudFormLabel;
         const fp = slot("form", label, measureCached(label, "bold 13px " + FONT_FALLBACK) + 20, 24, function () {
           const tw = measureCached(label, "bold 13px " + FONT_FALLBACK);
@@ -10051,6 +10158,22 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (full) { ctx.strokeStyle = "rgba(255,255,255," + (0.55 + Math.sin(frame * 0.12) * 0.2).toFixed(2) + ")"; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke(); return; }
     ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = ghostCharges > 0 ? "#ffffff" : col; ctx.beginPath(); ctx.arc(cx, cy, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, ghostRegen / ghostRegenNeed())); ctx.stroke();
+  }
+  function drawFireButton() {
+    if (!heldWeapon || heldWeapon.ammo <= 0 || state !== State.PLAY) return;
+    const b = FIRE_BTN;
+    const info = POWERUP_INFO[heldWeapon.kind] || { color: "#fff" };
+    ctx.save();
+    ctx.fillStyle = weaponFiring ? "#fff4cc" : info.color;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.stroke();
+    ctx.fillStyle = "#1a1208"; ctx.font = "bold 12px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Use", b.x, b.y - 6);
+    const frac = heldWeapon.max > 0 ? heldWeapon.ammo / heldWeapon.max : 0;
+    ctx.font = "bold 10px " + FONT;
+    ctx.fillText(heldWeapon.kind === "pellet" ? Math.ceil(heldWeapon.ammo / 60) + "s" : String(heldWeapon.ammo), b.x, b.y + 8);
+    ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke();
+    ctx.restore();
   }
   function drawSkillHud() {
     if (!uiButtons.skills) uiButtons.skills = [];
@@ -11417,6 +11540,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       drawScoreHUD();
       // Skill HUD + skill toasts only while playing (never on OVER/START)
       if (state === State.PLAY) {
+        drawFireButton();
         drawSkillHud();
         drawGhostCountdown();
         drawPowerupHud();
@@ -11453,6 +11577,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     // v1.17: one Sparrow, one skill tree. Convert old saves once: free evolution upgrades for levels already reached, skins refunded, notice shown.
     try {
       const evoGot = E.evoSync(save, peakLevel());
+      if (E.masterySync(save, peakLevel()).length) persist();
       let back = 0;
       if (!lsGet("skyhop_v117_skin")) {
         for (const sk of E.NEW_SKINS) if (unlocks.owned.indexOf(sk.id) >= 0) back += sk.price;
@@ -11561,19 +11686,23 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         const offered = offer.kind;
         bird.x = offer.x; bird.y = offer.y; bird.vy = 0;
         updatePowerups();
-        const active = weaponNow().slice();
-        if (active.length !== 1 || active[0] !== offered) return { ok: false, reason: "collect did not start that helper", offered: offered, active: active };
+        if (!heldWeapon || heldWeapon.kind !== offered || weaponNow().length) return { ok: false, reason: "pickup should store, not start", offered: offered, held: heldWeapon, active: weaponNow() };
+        const ammo0 = heldWeapon.ammo;
         wpnLog.length = 0;
-        let steps = 0;
         const spawnedWhile = [];
-        while (weaponNow().length && steps < 5000) {
-          invulnFrames = 8;
-          update();
-          steps++;
-          if (state !== State.PLAY) return { ok: false, reason: "run ended while helper active", steps: steps };
+        for (let i = 0; i < 90; i++) { invulnFrames = 8; update(); }
+        if (!heldWeapon || heldWeapon.ammo !== ammo0) return { ok: false, reason: "ammo changed while unused", ammo0: ammo0, ammo: heldWeapon && heldWeapon.ammo };
+        for (let i = 0; i < wpnLog.length; i++) if (wpnLog[i].ev === "spawn" && WPN_MIN_LV[wpnLog[i].kind]) spawnedWhile.push(wpnLog[i].kind);
+        keyFire = true; refreshFiring();
+        let steps = 0;
+        while (heldWeapon && heldWeapon.ammo > 0 && steps < 8000) {
+          invulnFrames = 8; update(); steps++;
           for (let i = 0; i < wpnLog.length; i++) if (wpnLog[i].ev === "spawn" && WPN_MIN_LV[wpnLog[i].kind]) spawnedWhile.push(wpnLog[i].kind);
         }
-        if (weaponNow().length) return { ok: false, reason: "helper did not end", steps: steps, active: weaponNow() };
+        keyFire = false; refreshFiring();
+        let tail = 0;
+        while (weaponNow().length && tail < 400) { invulnFrames = 8; update(); tail++; }
+        if (heldWeapon || weaponNow().length) return { ok: false, reason: "burst did not run out", steps: steps, held: heldWeapon, active: weaponNow() };
         const endedAt = wpnT;
         wpnLog.length = 0;
         let after = 0, next = null;
@@ -11587,7 +11716,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         }
         debugAuto = false;
         const gap = next ? next.t - endedAt : null;
-        return { ok: spawnedWhile.length === 0 && gap !== null && gap >= WPN_AFTER_MIN - 2, offered: offered, active: active, stepsWhile: steps, spawnedWhile: spawnedWhile, framesAfterEnd: gap, nextKind: next && next.kind, afterMin: WPN_AFTER_MIN, afterMax: WPN_AFTER_MAX };
+        return { ok: spawnedWhile.length === 0 && gap !== null && gap >= WPN_AFTER_MIN - 2, offered: offered, stored: true, ammo0: ammo0, stepsWhile: steps, spawnedWhile: spawnedWhile, framesAfterEnd: gap, nextKind: next && next.kind, afterMin: WPN_AFTER_MIN, afterMax: WPN_AFTER_MAX };
       },
       puGap: function () { return PU_MIN_GAP_PIPES - pk().puGapCut; },
       addCoinAt: function (x, y, risky) { coins.push({ x: x, y: y, value: 1, risky: !!risky, spin: 0, pulled: false, pipe: null, dx: 0, gy: 0 }); },
@@ -11598,6 +11727,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       zapInfo: function () { return { queue: zapQueue, hold: zapHold, strikes: zapStrikes, total: zapTotal }; },
       setGhost: function (c, f) { ghostCharges = c; ghostRegen = Math.round(ghostRegenNeed() * f); },
       weaponNow: function () { return weaponNow(); },
+      heldInfo: function () { return heldWeapon ? { kind: heldWeapon.kind, ammo: heldWeapon.ammo, max: heldWeapon.max, firing: weaponFiring } : null; },
+      setFiring: function (on) { keyFire = !!on; refreshFiring(); },
+      runBird: function () { return { runEvo: runEvo, saveEvo: save.evo | 0, name: E.EVO_NAMES[runEvo] || "", level: level }; },
+      masteryInfo: function () { return Object.assign({}, save.mastery || {}); },
+      beatAt: function (i) { return window.SkyHopObstacles.beatFor(i); },
       poofInfo: function () { return { queue: poofQueue, toys: toys.length, confetti: confetti.length, hold: poofHold }; },
       stubTest: function (i) { var p = pipes[i]; return p ? { cr: p.cr || null, stubT: p.stubT === undefined ? null : p.stubT, h: stubH(p), chunks: chunks.length, fx: obstFx(p).chip } : null; },
       crumbleStub: function (i, side) { var p = pipes[i]; crumblePipe(p, side); p.stubT = frame - STUB_GROW - 2; },

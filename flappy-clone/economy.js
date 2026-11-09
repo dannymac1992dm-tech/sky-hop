@@ -258,6 +258,10 @@
       for (const k of Object.keys(d.stats)) d.stats[k] = clampInt(raw.stats[k], 0, 1e9);
     }
     d.streak = normalizeStreak(raw.streak);
+    d.mastery = {};
+    if (raw.mastery && typeof raw.mastery === "object") {
+      for (let i = 0; i < MASTERY.length; i++) if (raw.mastery[MASTERY[i].id]) d.mastery[MASTERY[i].id] = 1;
+    }
     return d;
   }
 
@@ -544,6 +548,26 @@
       }
       save.evo = s;
       out.push({ stage: s, name: EVO_NAMES[s], reward: label, coins: coins });
+    }
+    return out;
+  }
+  // Later play-changing unlocks. Free when the best level is reached. Not a purchase.
+  // Levels: 800 ≈ obstacle 3995, 1500 ≈ 7495, 3000 ≈ 14995, 5000 ≈ 24995, 8000 ≈ 39995.
+  // Level 10000 is about obstacle 49995. Obstacle count here is (level - 1) * 5 gates.
+  const MASTERY = [
+    { id: "calm", level: 800, name: "Calm Entry", text: "The opening obstacle of a challenge section stays wide and still." },
+    { id: "reserve", level: 1500, name: "Reserve", text: "Stored bursts hold more time and more uses." },
+    { id: "glance", level: 3000, name: "Second Glance", text: "A close call lengthens the next easy stretch." },
+    { id: "keen", level: 5000, name: "Keen Eye", text: "A clean bonus gate pays more coins you earn." },
+    { id: "anchor", level: 8000, name: "Anchor", text: "Challenge obstacles move a little less." },
+  ];
+  function hasMastery(save, id) { return !!(save && save.mastery && save.mastery[id]); }
+  function masterySync(save, peak) {
+    if (!save.mastery || typeof save.mastery !== "object") save.mastery = {};
+    const out = [];
+    for (let i = 0; i < MASTERY.length; i++) {
+      const m = MASTERY[i];
+      if ((peak | 0) >= m.level && !save.mastery[m.id]) { save.mastery[m.id] = 1; out.push({ id: m.id, level: m.level, name: m.name, text: m.text }); }
     }
     return out;
   }
@@ -855,6 +879,7 @@
     BIRD_PERKS, BIRD_PERK_PRICES, BIRD_PERK_MIN_LEVEL, BIRD_PERK_NEUTRAL, birdPerkLevel, birdPerk, nextBirdPerkPrice, buyBirdPerk,
     PERKS, PERK_BY_ID, perkLevel, TREE, TREE_BY_ID, treeInfo, buyTreeStep, grantPart, stepInfo, OLD_PERK_MAP, RETIRED_SPECIES,
     EVO_LEVELS, EVO_NAMES, EVO_REWARDS, evoStageForLevel, evoProgress, evoSync,
+    MASTERY, hasMastery, masterySync,
     isSpeciesOwned, buySpecies, addCoins, cheapestGoal,
     generateMissions, streakMultiplier, progressMission, missionsLeft, levelTarget,
     almostMoments,

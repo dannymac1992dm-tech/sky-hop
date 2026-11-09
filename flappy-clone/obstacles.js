@@ -258,6 +258,22 @@
     return true;
   }
 
+  var BEAT_CHALLENGES = ["drift", "bob", "orbit", "wave", "triangle", "gateway"];
+  var BEAT_CUES = { drift: "Drift", bob: "Rise and fall", orbit: "Turning", wave: "Weave", triangle: "Three across", gateway: "Steady" };
+  /** Repeatable 20-obstacle cycle. The first challenge is obstacle 6 (index 5), well before 100. */
+  function beatFor(index) {
+    index = Math.max(0, index | 0);
+    var cycle = Math.floor(index / 20);
+    var step = index % 20;
+    var a = BEAT_CHALLENGES[cycle % BEAT_CHALLENGES.length];
+    var b = BEAT_CHALLENGES[(cycle + 2) % BEAT_CHALLENGES.length];
+    if (step < 5) return { index: index, step: step, pattern: "solo", role: "recovery", cue: null, gapAdd: 16, critter: false };
+    if (step < 9) return { index: index, step: step, pattern: a, role: "challenge", cue: step === 5 ? BEAT_CUES[a] : null, gapAdd: 0, critter: cycle >= 2 && cycle % 3 === 2 && step === 6 };
+    if (step < 12) return { index: index, step: step, pattern: "solo", role: "recovery", cue: null, gapAdd: 18, critter: false };
+    if (step < 17) return { index: index, step: step, pattern: b, role: "challenge", cue: step === 12 ? BEAT_CUES[b] : null, gapAdd: 0, critter: false };
+    return { index: index, step: step, pattern: index >= 80 && step === 17 ? "ring" : "gateway", role: "reward", cue: step === 17 ? "Bonus gate" : null, gapAdd: 8, critter: false };
+  }
+
   function layoutGate(opts) {
     var level = Math.max(1, opts.level | 0);
     var rng = opts.rng || mulberry((level * 100003 + (opts.serial | 0) * 9973 + 17) >>> 0);
@@ -270,7 +286,12 @@
     var pAmp = opts.pAmp || 0;
     var boss = !!opts.boss || (level >= 10 && level % 10 === 0);
     var milestone = level % 1000 === 0;
-    var pattern = opts.pattern || pickPattern(level, boss, milestone, rng);
+    var beat = null;
+    if (!boss && !milestone && opts.gateIndex != null) beat = beatFor(opts.gateIndex);
+    if (beat && opts.calmEntry && beat.role === "challenge" && beat.cue) {
+      beat = { index: beat.index, step: beat.step, pattern: "solo", role: "challenge", cue: beat.cue, gapAdd: 22, critter: false, calm: true };
+    }
+    var pattern = beat ? beat.pattern : (opts.pattern || pickPattern(level, boss, milestone, rng));
     var pool = poolFor(opts.worldIndex | 0, level);
     var rawSlots = slotsFor(pattern, rng);
     var bits = [];
@@ -285,6 +306,7 @@
       if (kind === "critter" && critters >= 1) kind = pool.primary;
       var r = radiusFor(pattern, level, rng);
       var amp = 0, drift = 0, spin = 0, rate = 0, drate = 0;
+      if (beat && beat.critter && i === 0) kind = "critter";
       if (motion === "bob" || kind === "debris" && pattern !== "solo") {
         amp = 8 + rng() * 8;
         rate = 0.018 + rng() * 0.012;
@@ -297,7 +319,8 @@
       if (motion === "orbit" || kind === "gear" || kind === "tri") {
         spin = (rng() < 0.5 ? -1 : 1) * (0.03 + rng() * (pattern === "orbit" || pattern === "gauntlet" ? 0.05 : 0.03));
       }
-      if (level < 20 && pattern === "solo") { amp = 0; drift = 0; }
+      if (opts.ampScale > 0 && opts.ampScale < 1) { amp *= opts.ampScale; drift *= opts.ampScale; }
+      if (level < 8 && pattern === "solo" && !(beat && beat.role === "challenge")) { amp = 0; drift = 0; }
       if (boss && motion) amp = Math.min(amp, 12);
       var ok = pushBit(bits, {
         side: s.side, ox: s.ox, r: r, amp: amp, rate: rate, ph: rng() * Math.PI * 2,
@@ -346,6 +369,7 @@
       pattern: pattern,
       family: fams[0] || pool.primary,
       families: fams,
+      beat: beat,
       worldId: pool.world.id,
       worldName: pool.world.name,
       lap: pool.lap,
@@ -426,6 +450,8 @@
     maxDiameter: maxDiameter,
     columnLike: columnLike,
     poolFor: poolFor,
-    pickPattern: pickPattern
+    pickPattern: pickPattern,
+    beatFor: beatFor,
+    BEAT_CUES: BEAT_CUES
   };
 })(typeof window !== "undefined" ? window : globalThis);

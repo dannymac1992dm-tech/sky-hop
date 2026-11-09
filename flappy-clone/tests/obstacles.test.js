@@ -178,6 +178,31 @@ console.log(JSON.stringify({
   fails: fails,
 }, null, 2));
 
+const first = O.beatFor(0);
+const sixth = O.beatFor(5);
+const within200 = {};
+for (let i = 0; i < 200; i++) within200[O.beatFor(i).pattern] = 1;
+check("first obstacles are a recovery", first.role === "recovery" && first.pattern === "solo", JSON.stringify(first));
+check("first challenge is before obstacle 100", sixth.role === "challenge" && sixth.index === 5, JSON.stringify(sixth));
+check("several behaviors before obstacle 200", Object.keys(within200).length >= 4, JSON.stringify(within200));
+for (let i = 0; i < 120; i++) {
+  const b = O.beatFor(i);
+  const gate = O.layoutGate({ level: 12, serial: i, gateIndex: i, worldIndex: 0, playH: PLAY_H, gap: 140, gapMin: 140, gapY0: 260, pAmp: 0, rng: O.mulberry(i + 9) });
+  if (O.columnLike(gate, PLAY_H) || !O.corridorClear(gate, 260, 0, 20)) check("beat gate stays fair", false, i + " " + b.pattern);
+}
+const mem2 = { store: {} };
+const storage2 = {
+  getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem2.store, k) ? mem2.store[k] : null; },
+  setItem: function (k, v) { mem2.store[k] = String(v); },
+};
+storage2.setItem(E.SAVE_KEY, JSON.stringify({ v: 1, coins: 50, evo: 20, tree: { glide: 2 }, mastery: { calm: 1 } }));
+const kept = E.loadSave(storage2, { unlocks: { owned: [] } }).save;
+check("old mastery flag migrates", kept.mastery.calm === 1);
+check("old evo and tree stay", kept.evo === 20 && kept.tree.glide === 2 && kept.coins === 50);
+const late = E.masterySync(kept, 8000);
+check("late mastery grants the later choices", late.length >= 4 && kept.mastery.anchor === 1, JSON.stringify(late));
+check("early peak does not grant late mastery", E.masterySync({ mastery: {} }, 100).length === 0);
+
 if (fails) {
   console.error(fails + " checks failed");
   process.exit(1);
