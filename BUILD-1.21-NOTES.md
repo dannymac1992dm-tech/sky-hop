@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 27) — not uploaded
+
+versionName stays 1.21. versionCode 27 replaces the code 26 packages. Nothing here is uploaded.
+
+## Scenery
+The opening view is Ember Reach: a dark copper sky, a low disc, haze ribbons, broken sky-bridges and a basalt parapet. The old light-blue sky, piled white clouds, rounded green hills, grass strip and striped dirt floor are not drawn. Each later realm has its own floor silhouette (stepped stone, ice teeth, girder deck, hull plates, timber, coral polyps, obsidian drips, glass fins). The score numerals are gold. A new run places the bird back at x 90 so it cannot stay off the side.
+
 # Sky Hop 1.21 revised test build (versionCode 26) — not uploaded
 
 Same user-facing version 1.21. versionCode moved from 25 to 26 because 25 was already built. Nothing here is a Play submission.

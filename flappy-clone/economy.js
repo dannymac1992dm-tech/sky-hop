@@ -24,7 +24,7 @@
   const EXTRA_SKILLS = [
     // v1.9: Ghost replaced Glide in the same slot (key 6, catalog unlock: 2 rewarded ads / 350 coins / free at level 40).
     // Once per run; lasts 5 pipes (not seconds), so cd/dur are unused for it. Glide owners are migrated in game.js.
-    { id: "ghost", name: "Ghost", key: "6", cd: 0, dur: 0, color: "#c9d6ff", catalogId: "skill_ghost", oncePerRun: true, pipes: 5, desc: "Fly through the next 5 pipes" },
+    { id: "ghost", name: "Ghost", key: "6", cd: 0, dur: 0, color: "#c9d6ff", catalogId: "skill_ghost", oncePerRun: true, pipes: 5, desc: "Fly through the next 5 gates" },
   ];
   const SKILL_BY_ID = {};
   for (const s of SKILLS.concat(EXTRA_SKILLS)) SKILL_BY_ID[s.id] = s;
@@ -381,18 +381,18 @@
     { id: "richPickups", name: "Rich Pickups", levels: [L(50, "+5% coins from every pickup", { coinBonus: 0.05 }), L(110, "+10% coins from every pickup", { coinBonus: 0.1 }), L(200, "+15% coins from every pickup", { coinBonus: 0.15 }), L(340, "+20% coins from every pickup", { coinBonus: 0.2 })] },
     { id: "coinShower", name: "Coin Shower", levels: [L(150, "3% chance a pickup bursts into +4 bonus coins", { showerChance: 0.03, showerCoins: 4 }), L(320, "5% chance of a +4 coin shower", { showerChance: 0.05, showerCoins: 4 }), L(560, "7% chance of a +5 coin shower", { showerChance: 0.07, showerCoins: 5 })] },
     { id: "rocketRecharge", name: "Rocket Recharge", levels: [L(70, "Rocket Boosts show up a bit sooner", { puGapCut: 1, rocketWeight: 2 }), L(150, "Rocket Boosts come around more often", { puGapCut: 2, rocketWeight: 2 }), L(260, "Rocket Boosts come around much more often", { puGapCut: 3, rocketWeight: 3 }), L(420, "Rocket Boosts are very frequent", { puGapCut: 4, rocketWeight: 3 })] },
-    { id: "mighty", name: "Mighty Bird", levels: [L(100, "Power Bird smashes 2 extra pipes", { powerBonus: 2 }), L(220, "Power Bird smashes 4 extra pipes", { powerBonus: 4 }), L(400, "Power Bird smashes 6 extra pipes", { powerBonus: 6 })] },
+    { id: "mighty", name: "Mighty Bird", levels: [L(100, "Power Bird smashes 2 extra gates", { powerBonus: 2 }), L(220, "Power Bird smashes 4 extra gates", { powerBonus: 4 }), L(400, "Power Bird smashes 6 extra gates", { powerBonus: 6 })] },
     { id: "talon", name: "Talon Smash", levels: [L(150, "The first hunter hit each run is poofed away instead of ending your run", { huntSmash: 1 }), L(330, "Your first two hunter hits are poofed away", { huntSmash: 2 }), L(580, "Your first three hunter hits are poofed away", { huntSmash: 3 })] },
     { id: "pellet", name: "Pellet Power", levels: [L(80, "Pellet Burst lasts 25% longer", { pelletFrames: 450 }), L(170, "Pellets fly faster in a denser stream", { pelletFrames: 450, pelletCut: 1 }), L(300, "Pellet Burst lasts 50% longer", { pelletFrames: 900, pelletCut: 1 }), L(500, "Longest, densest Pellet Burst (75% longer)", { pelletFrames: 1350, pelletCut: 2 })] },
     { id: "pop", name: "Pop Power", levels: [L(80, "Rocket Pop launches 7 extra rockets", { popExtra: 7 }), L(170, "Rockets daze hunters 30% longer", { popExtra: 7, popStun: 1.3 }), L(300, "Rocket Pop launches 15 extra rockets", { popExtra: 15, popStun: 1.3 }), L(500, "22 extra rockets and a longer daze", { popExtra: 22, popStun: 1.6 })] },
     { id: "poofMore", name: "More Poofs", levels: [L(90, "Poof Toy pickups give 1 extra toy", { poofExtra: 1 }), L(210, "2 extra toys per pickup", { poofExtra: 2 }), L(400, "3 extra toys per pickup", { poofExtra: 3 })] },
     { id: "poofBig", name: "Bigger Poof", levels: [L(110, "Bigger confetti poof (+20% reach)", { poofR: 9 }), L(240, "Even bigger poof (+40% reach)", { poofR: 18 }), L(430, "Giant poof (+60% reach)", { poofR: 27 })] },
     { id: "poofFast", name: "Quick Poof", levels: [L(100, "Toys are tossed 15% faster", { poofCut: 8 }), L(220, "Toys are tossed 30% faster", { poofCut: 16 }), L(380, "Toys are tossed 45% faster", { poofCut: 24 })] },
-    { id: "cannon", name: "Toy Popper", levels: [L(220, "Toy popper pellets crack pipes faster", { pipeDmg: 1 }), L(420, "Pellets hit harder: 1 pellet poofs a hunter away", { pipeDmg: 1, pelletDmg: 1 }), L(700, "Heavier toy popper: pipes crack even faster", { pipeDmg: 2, pelletDmg: 1 }), L(1000, "Grand toy popper: pipes crumble in 2 pellets", { pipeDmg: 3, pelletDmg: 1 })] },
+    { id: "cannon", name: "Toy Popper", levels: [L(220, "Toy popper pellets crack obstacles faster", { pipeDmg: 1 }), L(420, "Pellets hit harder: 1 pellet poofs a hunter away", { pipeDmg: 1, pelletDmg: 1 }), L(700, "Heavier toy popper: obstacles crack even faster", { pipeDmg: 2, pelletDmg: 1 }), L(1000, "Grand toy popper: obstacles crumble in 2 pellets", { pipeDmg: 3, pelletDmg: 1 })] },
     { id: "rotorLift", name: "Rotor Lift", levels: [L(150, "Toy rotors: 2% slower falls", { rotorMul: 0.98 }), L(320, "Bigger rotors: 4% slower falls", { rotorMul: 0.96 }), L(560, "Twin rotors: 6% slower falls", { rotorMul: 0.94 }), L(850, "Skycopter rotors: 8% slower falls", { rotorMul: 0.92 })] },
     { id: "rapidRockets", name: "Rapid Rockets", levels: [L(200, "Rocket Pop launches 17% faster", { rocketCut: 4 }), L(380, "Rocket Pop launches 33% faster", { rocketCut: 8 }), L(620, "Rocket Pop launches 50% faster", { rocketCut: 12 }), L(900, "Rocket Pop launches 67% faster", { rocketCut: 16 })] },
-    { id: "bounty", name: "Bonk Bounty", levels: [L(250, "+1 coin for every hunter or pipe you poof", { bounty: 1 }), L(500, "+2 coins for every poof", { bounty: 2 }), L(850, "+3 coins for every poof", { bounty: 3 })] },
-    { id: "crumble", name: "Crumble Touch", levels: [L(300, "Pipes crumble after 1 fewer hit", { pipeHpCut: 1 }), L(600, "Hunters poof away after 1 fewer hit", { pipeHpCut: 1, hunterHpCut: 1 }), L(950, "Pipes crumble after 2 fewer hits", { pipeHpCut: 2, hunterHpCut: 1 })] },
+    { id: "bounty", name: "Bonk Bounty", levels: [L(250, "+1 coin for every hunter or obstacle you poof", { bounty: 1 }), L(500, "+2 coins for every poof", { bounty: 2 }), L(850, "+3 coins for every poof", { bounty: 3 })] },
+    { id: "crumble", name: "Crumble Touch", levels: [L(300, "Obstacles crumble after 1 fewer hit", { pipeHpCut: 1 }), L(600, "Hunters poof away after 1 fewer hit", { pipeHpCut: 1, hunterHpCut: 1 }), L(950, "Obstacles crumble after 2 fewer hits", { pipeHpCut: 2, hunterHpCut: 1 })] },
   ];
   const PERK_BY_ID = {};
   for (const p of PERKS) PERK_BY_ID[p.id] = p;
@@ -441,11 +441,11 @@
     { id: "pellets", name: "Pellet Burst", skill: null, blurb: "Longer, faster, denser pellet stream", steps: [["perk", "pellet"], ["perk", "pellet"], ["perk", "pellet"], ["perk", "pellet"]] },
     { id: "pop", name: "Rocket Pop", skill: null, blurb: "More rockets, longer hunter daze", steps: [["perk", "pop"], ["perk", "pop"], ["perk", "pop"], ["perk", "pop"]] },
     { id: "poof", name: "Poof Toy", skill: null, blurb: "Toy poofs: more toys, bigger poof, quicker toss", steps: [["perk", "poofMore"], ["perk", "poofBig"], ["perk", "poofFast"], ["perk", "poofMore"], ["perk", "poofBig"], ["perk", "poofFast"], ["perk", "poofMore"], ["perk", "poofBig"], ["perk", "poofFast"]] },
-    { id: "cannon", name: "Toy Popper", skill: null, blurb: "Air Force power: pellets crack pipes faster and poof hunters sooner", steps: [["perk", "cannon"], ["perk", "cannon"], ["perk", "cannon"], ["perk", "cannon"]] },
+    { id: "cannon", name: "Toy Popper", skill: null, blurb: "Air Force power: pellets crack obstacles faster and poof hunters sooner", steps: [["perk", "cannon"], ["perk", "cannon"], ["perk", "cannon"], ["perk", "cannon"]] },
     { id: "rotor", name: "Rotor Lift", skill: null, blurb: "Helicopter rotors: slower, floatier falls", steps: [["perk", "rotorLift"], ["perk", "rotorLift"], ["perk", "rotorLift"], ["perk", "rotorLift"]] },
     { id: "rapid", name: "Rapid Rockets", skill: null, blurb: "Rocket Pop launches its rockets faster", steps: [["perk", "rapidRockets"], ["perk", "rapidRockets"], ["perk", "rapidRockets"], ["perk", "rapidRockets"]] },
-    { id: "bounty", name: "Bonk Bounty", skill: null, blurb: "More coins for every hunter or pipe you poof", steps: [["perk", "bounty"], ["perk", "bounty"], ["perk", "bounty"]] },
-    { id: "crumble", name: "Crumble Touch", skill: null, blurb: "Heavy plating: pipes and hunters give up sooner", steps: [["perk", "crumble"], ["perk", "crumble"], ["perk", "crumble"]] },
+    { id: "bounty", name: "Bonk Bounty", skill: null, blurb: "More coins for every hunter or obstacle you poof", steps: [["perk", "bounty"], ["perk", "bounty"], ["perk", "bounty"]] },
+    { id: "crumble", name: "Crumble Touch", skill: null, blurb: "Heavy plating: obstacles and hunters give up sooner", steps: [["perk", "crumble"], ["perk", "crumble"], ["perk", "crumble"]] },
   ];
   const TREE_BY_ID = {};
   for (const n of TREE) TREE_BY_ID[n.id] = n;
@@ -609,7 +609,7 @@
   // "bigcoin" stays defined (old saved missions still resolve) but is no longer generated
   // because risky coins are now ~1 per 40 pipes.
   const MISSION_TYPES = [
-    { id: "pipes", scope: "day", targets: [25, 40, 60], rewards: [8, 14, 20], label: (n) => "Pass " + n + " pipes" },
+    { id: "pipes", scope: "day", targets: [25, 40, 60], rewards: [8, 14, 20], label: (n) => "Pass " + n + " gates" },
     { id: "coins", scope: "day", targets: [5, 8, 12], rewards: [8, 14, 20], label: (n) => "Collect " + n + " coins" },
     { id: "level", scope: "run", targets: null, rewards: [10, 15, 20], label: (n) => "Reach level " + n },
     { id: "near", scope: "day", targets: [3, 5, 8], rewards: [8, 12, 16], label: (n) => "Get " + n + " close calls" },

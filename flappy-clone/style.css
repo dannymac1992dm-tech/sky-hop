@@ -10,7 +10,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #1a2a3a;
+  background: #120c14;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
@@ -25,7 +25,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #2a4055 0%, #152030 100%);
+  background: radial-gradient(ellipse at center, #3a2430 0%, #120c14 100%);
   /* Native AdMob banner (BOTTOM_CENTER) — ads.js sets --ad-banner-pad when shown */
   padding-bottom: var(--ad-banner-pad, 0px);
   /* v1.9.1: keep the canvas out of the status bar / camera cutout. On the Fold's inner screen the
@@ -49,7 +49,7 @@ html, body {
     0 0 0 3px rgba(255, 255, 255, 0.12),
     0 20px 60px rgba(0, 0, 0, 0.45);
   cursor: pointer;
-  background: #6ec6ff;
+  background: #1a1038;
 }
 
 #hud-btns {

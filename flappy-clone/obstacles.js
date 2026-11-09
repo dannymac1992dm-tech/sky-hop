@@ -12,7 +12,7 @@
   var CUSHION = 6;
 
   var WORLD_BANDS = [
-    { id: "day", name: "Day Sky", bands: [
+    { id: "day", name: "Ember Reach", bands: [
       ["rock", "lantern"],
       ["rock", "lantern", "kite"],
       ["rock", "kite", "lantern", "crystal"],
@@ -60,7 +60,7 @@
       ["lavabomb", "debris", "gear", "rock"],
       ["debris", "lavabomb", "gear", "tri", "rock"]
     ]},
-    { id: "candy", name: "Pastel Skies", bands: [
+    { id: "candy", name: "Glass Aurora", bands: [
       ["gumdrop", "lantern"],
       ["gumdrop", "lantern", "crystal"],
       ["gumdrop", "crystal", "kite", "lantern"],
