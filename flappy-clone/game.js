@@ -9145,96 +9145,227 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.bezierCurveTo(-1.55, -7.7, -1.05, -9.35, 0, -9.6);
     ctx.closePath();
   }
+  function hawkPaint(pal) {
+    const warm = (pal.species || "sparrow") === "sparrow" && pal.birdId === "bird_default";
+    return {
+      body: warm ? "#e0242c" : scHex(pal.body1),
+      deep: warm ? "#6e0c16" : scHex(pal.body2),
+      wingC: warm ? "#d32622" : scHex(pal.wing),
+      wingD: warm ? "#8e1418" : scHex(pal.wingDark),
+      gold: warm ? "#ffd36a" : scHex(pal.beak),
+      ember: warm ? "#ff7a2a" : mixHex(scHex(pal.body1), scHex(pal.beak), 0.45),
+      lite: warm ? "#ff7a55" : mixHex(scHex(pal.body1), "#fff6e0", 0.3)
+    };
+  }
+  /** One broad glide wing. The outline is a single shape, with shallow tip notches rather than separate feathers. */
+  function traceHawkWing(span, rise) {
+    const tipX = span;
+    const tipY = 0.45 - rise * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(1.45, -1.45 - rise * 0.1);
+    ctx.bezierCurveTo(span * 0.24, -2.55 - rise * 0.7, span * 0.58, -1.85 - rise * 0.85, tipX - 2.4, tipY - 0.45);
+    ctx.bezierCurveTo(tipX - 0.6, tipY - 0.65, tipX + 0.25, tipY + 0.25, tipX - 0.35, tipY + 0.95);
+    ctx.quadraticCurveTo(tipX - 1.05, tipY + 1.85, tipX - 1.9, tipY + 0.95);
+    ctx.quadraticCurveTo(tipX - 2.35, tipY + 1.75, tipX - 3.15, tipY + 1.0);
+    ctx.quadraticCurveTo(tipX - 3.55, tipY + 1.65, tipX - 4.35, tipY + 1.05);
+    ctx.bezierCurveTo(span * 0.66, 3.05 - rise * 0.05, span * 0.34, 3.35, 4.8, 2.45);
+    ctx.quadraticCurveTo(2.3, 0.7, 1.45, -1.45 - rise * 0.1);
+    ctx.closePath();
+  }
+  function hawkWing(sign, lift, C, bands) {
+    const up = Math.max(0, Math.min(1, lift || 0));
+    const span = 16.2 * (1 - up * 0.14);
+    const rise = up * 1.85;
+    ctx.save();
+    ctx.scale(sign, 1);
+    traceHawkWing(span, rise);
+    const g = ctx.createLinearGradient(1.2, 0, span, 0.4);
+    g.addColorStop(0, C.deep);
+    g.addColorStop(0.22, C.body);
+    g.addColorStop(0.55, C.wingC);
+    g.addColorStop(1, mixHex(C.wingD, C.gold, 0.18));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = mixHex(C.lite, C.gold, 0.35);
+    ctx.globalAlpha = 0.72;
+    ctx.lineWidth = 0.38;
+    for (let i = 0; i < 5; i++) {
+      const y0 = -0.55 + i * 0.38;
+      const y1 = 0.15 + i * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(2.6, y0);
+      ctx.bezierCurveTo(span * 0.4, y0 - 0.25, span * 0.72, y1 - 0.05, span - 2.4, y1);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.88;
+    ctx.strokeStyle = C.gold;
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(3.4, 0.15);
+    ctx.quadraticCurveTo(span * 0.38, -0.35, span * 0.55, 0.2);
+    ctx.stroke();
+    if (bands > 4) {
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(span * 0.33, -1.15);
+      ctx.quadraticCurveTo(span * 0.38, 0.35, span * 0.3, 1.7);
+      ctx.stroke();
+    }
+    ctx.restore();
+    traceHawkWing(span, rise);
+    ctx.strokeStyle = C.deep;
+    ctx.lineWidth = 0.65;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,236,190,0.82)";
+    ctx.lineWidth = 0.45;
+    ctx.beginPath();
+    ctx.moveTo(2.3, -0.85 - rise * 0.1);
+    ctx.bezierCurveTo(span * 0.35, -1.4 - rise * 0.55, span * 0.68, -0.85 - rise * 0.6, span - 1.6, 0.05 - rise * 0.35);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function traceHawkTail() {
+    ctx.beginPath();
+    ctx.moveTo(-1.05, 3.15);
+    ctx.lineTo(-1.55, 10.55);
+    ctx.quadraticCurveTo(-1.55, 11.25, -0.65, 11.25);
+    ctx.lineTo(0.65, 11.25);
+    ctx.quadraticCurveTo(1.55, 11.25, 1.55, 10.55);
+    ctx.lineTo(1.05, 3.15);
+    ctx.closePath();
+  }
+  function hawkTail(C) {
+    traceHawkTail();
+    const g = ctx.createLinearGradient(0, 3.2, 0, 11.2);
+    g.addColorStop(0, C.deep);
+    g.addColorStop(0.35, C.body);
+    g.addColorStop(0.78, C.wingC);
+    g.addColorStop(1, mixHex(C.body, C.gold, 0.4));
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.strokeStyle = "rgba(255,220,150,0.55)";
+    ctx.lineWidth = 0.35;
+    ctx.beginPath();
+    ctx.moveTo(-0.5, 3.5); ctx.lineTo(-0.75, 10.9);
+    ctx.moveTo(0, 3.4); ctx.lineTo(0, 11.05);
+    ctx.moveTo(0.5, 3.5); ctx.lineTo(0.75, 10.9);
+    ctx.stroke();
+    ctx.strokeStyle = C.gold;
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(-1.4, 9.15); ctx.lineTo(1.4, 9.15);
+    ctx.stroke();
+    ctx.restore();
+    traceHawkTail();
+    ctx.strokeStyle = C.deep;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = 0.38;
+    ctx.strokeStyle = C.ember;
+    ctx.lineWidth = 0.65;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-1.35, 5.2);
+    ctx.quadraticCurveTo(-2.15, 7.8, -1.55, 10.6);
+    ctx.moveTo(1.35, 5.2);
+    ctx.quadraticCurveTo(2.15, 7.9, 1.55, 10.7);
+    ctx.stroke();
+    ctx.restore();
+  }
   function drawBirdUp(pal, wingLift) {
     const st = scStep(pal.evo);
     const fk = evoFitBusy ? 1 : evoFit(pal);
-    const warm = (pal.species || "sparrow") === "sparrow" && pal.birdId === "bird_default";
-    const body = warm ? "#e0242c" : scHex(pal.body1);
-    const deep = warm ? "#6e0c16" : scHex(pal.body2);
-    const wingC = warm ? "#d32622" : scHex(pal.wing);
-    const wingD = warm ? "#8e1418" : scHex(pal.wingDark);
-    const gold = warm ? "#ffd36a" : scHex(pal.beak);
-    const ember = warm ? "#ff7a2a" : mixHex(scHex(pal.body1), scHex(pal.beak), 0.45);
+    const C = hawkPaint(pal);
     const lift = Math.max(0, Math.min(1, wingLift || 0));
-    const edge = deep;
     ctx.save();
-    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.05, BIRD_VISUAL_SCALE * fk * 2.05);
+    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.25, BIRD_VISUAL_SCALE * fk * 2.25);
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    const glow = ctx.createRadialGradient(0, 2, 1, 0, 4, 14);
-    glow.addColorStop(0, warm ? "rgba(255,186,70,0.32)" : "rgba(255,255,255,0.14)");
+    const glow = ctx.createRadialGradient(0, 1, 1, 0, 2, 12);
+    glow.addColorStop(0, C.gold === "#ffd36a" ? "rgba(255,186,70,0.28)" : "rgba(255,255,255,0.12)");
     glow.addColorStop(1, "rgba(255,80,20,0)");
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.ellipse(0, 4, 12, 13, 0, 0, Math.PI * 2); ctx.fill();
-    tailTrio(0, 8.4, lift, ember, gold, wingC, edge);
-    soarWing(-1, lift, wingC, wingD, gold, ember, edge);
-    soarWing(1, lift, wingC, wingD, gold, ember, edge);
-    upBodyPath();
-    const bg = ctx.createLinearGradient(-3.2, -6, 3.2, 8);
-    bg.addColorStop(0, deep);
-    bg.addColorStop(0.34, body);
-    bg.addColorStop(0.5, mixHex(body, gold, 0.16));
-    bg.addColorStop(0.66, body);
-    bg.addColorStop(1, deep);
+    ctx.beginPath(); ctx.ellipse(0, 2, 11, 9, 0, 0, Math.PI * 2); ctx.fill();
+    hawkTail(C);
+    hawkWing(-1, lift, C, st >= 18 ? 5 : 4);
+    hawkWing(1, lift, C, st >= 18 ? 5 : 4);
+    function traceUpBody() {
+      ctx.beginPath();
+      ctx.moveTo(0, -5.15);
+      ctx.bezierCurveTo(1.45, -4.85, 1.85, -2.7, 1.65, -0.2);
+      ctx.bezierCurveTo(1.45, 1.9, 1.05, 3.35, 0.1, 4.25);
+      ctx.bezierCurveTo(-1.05, 3.35, -1.45, 1.9, -1.65, -0.2);
+      ctx.bezierCurveTo(-1.85, -2.7, -1.45, -4.85, 0, -5.15);
+      ctx.closePath();
+    }
+    traceUpBody();
+    const bg = ctx.createLinearGradient(-1.6, -4, 1.6, 4);
+    bg.addColorStop(0, C.deep);
+    bg.addColorStop(0.42, C.body);
+    bg.addColorStop(0.5, mixHex(C.body, C.gold, 0.18));
+    bg.addColorStop(0.62, C.body);
+    bg.addColorStop(1, C.deep);
     ctx.fillStyle = bg;
     ctx.fill();
     ctx.save();
-    upBodyPath();
     ctx.clip();
-    const hi = ctx.createLinearGradient(0, -9, 0, 8);
-    hi.addColorStop(0, "rgba(255,236,190,0.42)");
-    hi.addColorStop(0.4, "rgba(255,236,190,0)");
-    hi.addColorStop(1, "rgba(40,0,8,0.28)");
+    const hi = ctx.createLinearGradient(0, -5, 0, 4);
+    hi.addColorStop(0, "rgba(255,236,190,0.4)");
+    hi.addColorStop(0.45, "rgba(255,236,190,0)");
+    hi.addColorStop(1, "rgba(40,0,8,0.22)");
     ctx.fillStyle = hi;
-    ctx.fillRect(-4, -10, 8, 20);
-    ctx.fillStyle = "rgba(255,210,120,0.16)";
-    ctx.beginPath(); ctx.ellipse(0, -1.4, 0.85, 3.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(255,214,130,0.4)";
-    ctx.lineWidth = 0.4;
-    ctx.beginPath(); ctx.moveTo(-1.35, 2.2); ctx.quadraticCurveTo(0, 3.3, 1.35, 2.2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-1.05, 4.4); ctx.quadraticCurveTo(0, 5.3, 1.05, 4.4); ctx.stroke();
+    ctx.fillRect(-2, -6, 4, 11);
     ctx.restore();
-    upBodyPath();
-    ctx.strokeStyle = deep;
-    ctx.lineWidth = 0.75;
+    traceUpBody();
+    ctx.strokeStyle = C.deep;
+    ctx.lineWidth = 0.7;
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, -7.6);
-    ctx.bezierCurveTo(0.28, -3.4, 0.16, 1.4, 0, 6.6);
-    ctx.strokeStyle = "rgba(255,214,120,0.75)";
+    ctx.moveTo(0, -7.85);
+    ctx.bezierCurveTo(0.85, -6.7, 1.05, -5.7, 0.72, -4.95);
+    ctx.quadraticCurveTo(0, -5.35, -0.72, -4.95);
+    ctx.bezierCurveTo(-1.05, -5.7, -0.85, -6.7, 0, -7.85);
+    ctx.closePath();
+    ctx.fillStyle = C.lite;
+    ctx.fill();
+    ctx.strokeStyle = C.deep;
     ctx.lineWidth = 0.6;
     ctx.stroke();
-    ctx.fillStyle = mixHex(body, gold, 0.08);
-    ctx.beginPath(); ctx.ellipse(0, -10.35, 1.62, 1.9, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = deep; ctx.lineWidth = 0.6; ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, -12.05);
-    ctx.quadraticCurveTo(0.48, -11.15, 0.28, -10.2);
-    ctx.quadraticCurveTo(0, -10.45, -0.28, -10.2);
-    ctx.quadraticCurveTo(-0.48, -11.15, 0, -12.05);
-    ctx.fillStyle = gold; ctx.fill();
-    ctx.strokeStyle = deep; ctx.lineWidth = 0.4; ctx.stroke();
-    featherTo(-0.35, -11.1, -2.15, -13.3, 0.85, ember, edge);
-    featherTo(0, -11.35, 0.15, -15.1, 0.95, gold, edge);
-    featherTo(0.35, -11.1, 2.15, -13.3, 0.85, ember, edge);
-    if (st >= 16) featherTo(-0.9, -10.6, -2.5, -11.6, 0.7, gold, edge);
-    if (st >= 28) featherTo(0.9, -10.6, 2.5, -11.6, 0.7, ember, edge);
-    if (st >= 20) {
-      ctx.strokeStyle = gold;
-      ctx.lineWidth = 0.65;
-      ctx.beginPath(); ctx.arc(0, 0.6, 1.9, 0.4, Math.PI * 1.6); ctx.stroke();
+    ctx.moveTo(-0.28, -6.55);
+    ctx.quadraticCurveTo(0.05, -8.15, 0.42, -8.45);
+    ctx.quadraticCurveTo(0.55, -7.35, 0.48, -6.55);
+    ctx.quadraticCurveTo(0.1, -6.85, -0.28, -6.55);
+    ctx.closePath();
+    ctx.fillStyle = C.gold;
+    ctx.fill();
+    ctx.strokeStyle = C.deep;
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
+    if (st >= 24) {
+      ctx.strokeStyle = C.gold;
+      ctx.lineWidth = 0.55;
+      ctx.beginPath(); ctx.arc(0, 0.2, 1.35, 0.4, Math.PI * 1.55); ctx.stroke();
     }
     if (state === State.PLAY && ghostPipesLeft > 0) {
       ctx.globalAlpha = 0.4;
       ctx.strokeStyle = "#e6ecff";
-      ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(0, 0, 13.2, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.arc(0, 0.4, 12.5, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     if (state === State.PLAY && shieldUp()) {
       ctx.strokeStyle = "rgba(190,230,255,0.9)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(0, 0, 13.8, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(0, 0.4, 13, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }

@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 32) — not uploaded
+
+versionName stays 1.21. versionCode 32. Nothing here is uploaded.
+
+## Climb pose
+The climb bird is a top-down glide: long broad wings, a small pointed head, and a squared tail. It replaces the fingered wings from code 31. The hit circle is unchanged. `BIRD_FLIP` is unchanged.
+
 # Sky Hop 1.21 revised test build (versionCode 31) — not uploaded
 
 versionName stays 1.21. versionCode 31. Nothing here is uploaded.
