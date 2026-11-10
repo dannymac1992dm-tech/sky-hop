@@ -9056,189 +9056,336 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
     ctx.restore();
   }
-  /** A tapered soaring feather. Tip is at (len, 0). Kept slim so the wings stay compact. */
+  /** A slim flight feather. The tip is a point at (len, 0) so neighbouring primaries stay separated. */
   function soarFeather(len, baseW, col, edge) {
-    const L = Math.max(5, len), w = baseW;
+    const L = Math.max(4, len), w = baseW;
     ctx.beginPath();
-    ctx.moveTo(0, -w * 0.2);
-    ctx.bezierCurveTo(L * 0.28, -w * 1.15, L * 0.62, -w * 0.85, L, -w * 0.05);
-    ctx.bezierCurveTo(L * 0.78, w * 0.55, L * 0.38, w * 0.72, 0, w * 0.28);
+    ctx.moveTo(0, -w * 0.12);
+    ctx.bezierCurveTo(L * 0.2, -w * 0.85, L * 0.55, -w * 0.42, L, 0);
+    ctx.bezierCurveTo(L * 0.58, w * 0.34, L * 0.24, w * 0.42, 0, w * 0.16);
     ctx.closePath();
     const g = ctx.createLinearGradient(0, 0, L, 0);
     g.addColorStop(0, edge);
-    g.addColorStop(0.45, col);
-    g.addColorStop(1, mixHex(scHex(col), "#fff6d0", 0.28));
+    g.addColorStop(0.4, col);
+    g.addColorStop(1, mixHex(scHex(col), "#fff6d0", 0.34));
     ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,244,210,0.7)";
-    ctx.lineWidth = 0.45;
+    ctx.strokeStyle = "rgba(255,246,214,0.75)";
+    ctx.lineWidth = 0.4;
     ctx.beginPath();
-    ctx.moveTo(0.8, 0);
-    ctx.bezierCurveTo(L * 0.35, -w * 0.15, L * 0.7, -w * 0.08, L * 0.92, 0);
+    ctx.moveTo(0.5, 0);
+    ctx.bezierCurveTo(L * 0.3, -w * 0.08, L * 0.65, -w * 0.04, L * 0.9, 0);
     ctx.stroke();
     ctx.strokeStyle = edge;
-    ctx.lineWidth = 0.65;
+    ctx.lineWidth = 0.55;
     ctx.beginPath();
-    ctx.moveTo(0, -w * 0.2);
-    ctx.bezierCurveTo(L * 0.28, -w * 1.15, L * 0.62, -w * 0.85, L, -w * 0.05);
-    ctx.bezierCurveTo(L * 0.78, w * 0.55, L * 0.38, w * 0.72, 0, w * 0.28);
+    ctx.moveTo(0, -w * 0.12);
+    ctx.bezierCurveTo(L * 0.2, -w * 0.85, L * 0.55, -w * 0.42, L, 0);
+    ctx.bezierCurveTo(L * 0.58, w * 0.34, L * 0.24, w * 0.42, 0, w * 0.16);
     ctx.closePath();
     ctx.stroke();
   }
-  /** Ember streamer. Hangs downward from the local origin. */
+  /** One long ember tail feather hanging from the local origin, with a soft glow. */
   function emberStreamer(len, bend, col, glow) {
-    const wave = Math.sin(frame * 0.18 + bend * 4) * 0.6;
+    const wave = Math.sin(frame * 0.2 + bend * 3.1) * 0.8;
+    const x1 = bend * 0.4, y1 = len * 0.46;
+    const x2 = bend * 0.65 + wave, y2 = len;
     ctx.save();
-    ctx.strokeStyle = glow;
-    ctx.lineWidth = 3.2;
     ctx.lineCap = "round";
-    ctx.globalAlpha = 0.35;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = glow;
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = 4.4;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(bend * 0.4, len * 0.35, bend + wave, len * 0.7, bend * 0.35 + wave, len);
+    ctx.bezierCurveTo(x1, y1 * 0.55, x2 - wave * 0.25, y1, x2, y2);
     ctx.stroke();
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 1.35;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.bezierCurveTo(bend * 0.4, len * 0.35, bend + wave, len * 0.7, bend * 0.35 + wave, len);
-    ctx.stroke();
-    ctx.fillStyle = "#fff6c8";
-    ctx.beginPath();
-    ctx.arc(bend * 0.35 + wave, len, 0.7, 0, Math.PI * 2);
+    ctx.moveTo(-0.5, 0);
+    ctx.bezierCurveTo(x1 - 0.85, y1, x2 - 0.12, y2 * 0.7, x2, y2);
+    ctx.bezierCurveTo(x2 + 0.12, y2 * 0.7, x1 + 0.85, y1, 0.5, 0);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, 0, x2, y2);
+    g.addColorStop(0, col);
+    g.addColorStop(0.62, glow);
+    g.addColorStop(1, "#fff8d4");
+    ctx.fillStyle = g;
     ctx.fill();
+    ctx.strokeStyle = "rgba(70,14,18,0.55)";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,248,220,0.85)";
+    ctx.lineWidth = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.3);
+    ctx.bezierCurveTo(x1 * 0.45, y1, x2 * 0.55, y2 * 0.68, x2 * 0.82, y2 * 0.9);
+    ctx.stroke();
     ctx.restore();
   }
   /**
    * Climb pose, seen from behind while soaring up.
    * Local space stays inside about ±15 by -12..16 so the on-screen footprint matches the side view.
    */
+  function featherTo(x0, y0, x1, y1, hw, col, edge) {
+    ctx.save();
+    ctx.translate(x0, y0);
+    ctx.rotate(Math.atan2(y1 - y0, x1 - x0));
+    quillAlong(Math.hypot(x1 - x0, y1 - y0), hw, col, edge);
+    ctx.restore();
+  }
+  function upBodyPath() {
+    ctx.beginPath();
+    ctx.moveTo(0, -9.6);
+    ctx.bezierCurveTo(1.05, -9.35, 1.55, -7.7, 1.7, -6.15);
+    ctx.bezierCurveTo(3.15, -4.7, 3.55, -2.15, 3.2, 0.55);
+    ctx.bezierCurveTo(2.75, 3.55, 1.7, 6.7, 0.12, 9.7);
+    ctx.bezierCurveTo(-1.7, 6.7, -2.75, 3.55, -3.2, 0.55);
+    ctx.bezierCurveTo(-3.55, -2.15, -3.15, -4.7, -1.7, -6.15);
+    ctx.bezierCurveTo(-1.55, -7.7, -1.05, -9.35, 0, -9.6);
+    ctx.closePath();
+  }
   function drawBirdUp(pal, wingLift) {
     const st = scStep(pal.evo);
     const fk = evoFitBusy ? 1 : evoFit(pal);
     const warm = (pal.species || "sparrow") === "sparrow" && pal.birdId === "bird_default";
     const body = warm ? "#e0242c" : scHex(pal.body1);
     const deep = warm ? "#6e0c16" : scHex(pal.body2);
-    const wingC = warm ? "#c81e28" : scHex(pal.wing);
-    const wingD = warm ? "#7a1020" : scHex(pal.wingDark);
+    const wingC = warm ? "#d32622" : scHex(pal.wing);
+    const wingD = warm ? "#8e1418" : scHex(pal.wingDark);
     const gold = warm ? "#ffd36a" : scHex(pal.beak);
     const ember = warm ? "#ff7a2a" : mixHex(scHex(pal.body1), scHex(pal.beak), 0.45);
     const lift = Math.max(0, Math.min(1, wingLift || 0));
+    const edge = deep;
     ctx.save();
-    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.15, BIRD_VISUAL_SCALE * fk * 2.15);
+    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.05, BIRD_VISUAL_SCALE * fk * 2.05);
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    const glow = ctx.createRadialGradient(0, -1, 1, 0, 2, 16);
-    glow.addColorStop(0, warm ? "rgba(255,190,70,0.35)" : "rgba(255,255,255,0.16)");
+    const glow = ctx.createRadialGradient(0, 2, 1, 0, 4, 14);
+    glow.addColorStop(0, warm ? "rgba(255,186,70,0.32)" : "rgba(255,255,255,0.14)");
     glow.addColorStop(1, "rgba(255,80,20,0)");
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.ellipse(0, 2, 14, 15, 0, 0, Math.PI * 2); ctx.fill();
-    emberStreamer(13 + Math.min(3, st * 0.06), -1.6, ember, gold);
-    emberStreamer(15.5 + Math.min(2, st * 0.04), 0.15, gold, "rgba(255,220,140,0.9)");
-    emberStreamer(12.5 + Math.min(3, st * 0.06), 1.7, warm ? "#ff4a22" : wingC, ember);
-    soarWing(-1, lift, wingC, wingD, gold, deep, st);
-    soarWing(1, lift, wingC, wingD, gold, deep, st);
-    ctx.beginPath();
-    ctx.moveTo(0, -8.6);
-    ctx.bezierCurveTo(2.1, -8.1, 3.5, -5.2, 3.15, -1.4);
-    ctx.bezierCurveTo(2.9, 2.6, 1.7, 6.4, 0.15, 9.2);
-    ctx.bezierCurveTo(-1.7, 6.4, -2.9, 2.6, -3.15, -1.4);
-    ctx.bezierCurveTo(-3.5, -5.2, -2.1, -8.1, 0, -8.6);
-    ctx.closePath();
-    const bg = ctx.createLinearGradient(-3.2, 0, 3.2, 0);
+    ctx.beginPath(); ctx.ellipse(0, 4, 12, 13, 0, 0, Math.PI * 2); ctx.fill();
+    tailTrio(0, 8.4, lift, ember, gold, wingC, edge);
+    soarWing(-1, lift, wingC, wingD, gold, ember, edge);
+    soarWing(1, lift, wingC, wingD, gold, ember, edge);
+    upBodyPath();
+    const bg = ctx.createLinearGradient(-3.2, -6, 3.2, 8);
     bg.addColorStop(0, deep);
-    bg.addColorStop(0.42, body);
-    bg.addColorStop(0.5, mixHex(body, gold, 0.28));
-    bg.addColorStop(0.58, body);
+    bg.addColorStop(0.34, body);
+    bg.addColorStop(0.5, mixHex(body, gold, 0.16));
+    bg.addColorStop(0.66, body);
     bg.addColorStop(1, deep);
     ctx.fillStyle = bg;
     ctx.fill();
     ctx.save();
+    upBodyPath();
     ctx.clip();
-    const hi = ctx.createLinearGradient(0, -8, 0, 6);
-    hi.addColorStop(0, "rgba(255,236,180,0.55)");
-    hi.addColorStop(0.45, "rgba(255,236,180,0)");
+    const hi = ctx.createLinearGradient(0, -9, 0, 8);
+    hi.addColorStop(0, "rgba(255,236,190,0.42)");
+    hi.addColorStop(0.4, "rgba(255,236,190,0)");
     hi.addColorStop(1, "rgba(40,0,8,0.28)");
     ctx.fillStyle = hi;
-    ctx.fillRect(-4, -9, 8, 18);
+    ctx.fillRect(-4, -10, 8, 20);
+    ctx.fillStyle = "rgba(255,210,120,0.16)";
+    ctx.beginPath(); ctx.ellipse(0, -1.4, 0.85, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,214,130,0.4)";
+    ctx.lineWidth = 0.4;
+    ctx.beginPath(); ctx.moveTo(-1.35, 2.2); ctx.quadraticCurveTo(0, 3.3, 1.35, 2.2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-1.05, 4.4); ctx.quadraticCurveTo(0, 5.3, 1.05, 4.4); ctx.stroke();
     ctx.restore();
+    upBodyPath();
     ctx.strokeStyle = deep;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 0.75;
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, -8.2);
-    ctx.bezierCurveTo(0.4, -4, 0.3, 1, 0, 6.5);
-    ctx.strokeStyle = "rgba(255,220,140,0.55)";
-    ctx.lineWidth = 0.7;
+    ctx.moveTo(0, -7.6);
+    ctx.bezierCurveTo(0.28, -3.4, 0.16, 1.4, 0, 6.6);
+    ctx.strokeStyle = "rgba(255,214,120,0.75)";
+    ctx.lineWidth = 0.6;
     ctx.stroke();
-    ctx.fillStyle = mixHex(body, gold, 0.2);
-    ctx.beginPath(); ctx.ellipse(0, -9.4, 2.15, 2.45, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = deep; ctx.lineWidth = 0.7; ctx.stroke();
-    ctx.fillStyle = gold;
+    ctx.fillStyle = mixHex(body, gold, 0.08);
+    ctx.beginPath(); ctx.ellipse(0, -10.35, 1.62, 1.9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = deep; ctx.lineWidth = 0.6; ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, -13.1);
-    ctx.bezierCurveTo(0.7, -11.6, 0.55, -10.4, 0, -9.7);
-    ctx.bezierCurveTo(-0.55, -10.4, -0.7, -11.6, 0, -13.1);
-    ctx.fill();
-    const crests = 3 + (st >= 16 ? 1 : 0);
-    for (let i = 0; i < crests; i++) {
-      const t = crests === 1 ? 0 : (i / (crests - 1) - 0.5);
-      ctx.save();
-      ctx.translate(t * 1.5, -10.2);
-      ctx.rotate(-Math.PI / 2 + t * 0.55);
-      soarFeather(5.2 + (1 - Math.abs(t)) * 1.6, 0.85, i === Math.floor(crests / 2) ? gold : ember, deep);
-      ctx.restore();
-    }
+    ctx.moveTo(0, -12.05);
+    ctx.quadraticCurveTo(0.48, -11.15, 0.28, -10.2);
+    ctx.quadraticCurveTo(0, -10.45, -0.28, -10.2);
+    ctx.quadraticCurveTo(-0.48, -11.15, 0, -12.05);
+    ctx.fillStyle = gold; ctx.fill();
+    ctx.strokeStyle = deep; ctx.lineWidth = 0.4; ctx.stroke();
+    featherTo(-0.35, -11.1, -2.15, -13.3, 0.85, ember, edge);
+    featherTo(0, -11.35, 0.15, -15.1, 0.95, gold, edge);
+    featherTo(0.35, -11.1, 2.15, -13.3, 0.85, ember, edge);
+    if (st >= 16) featherTo(-0.9, -10.6, -2.5, -11.6, 0.7, gold, edge);
+    if (st >= 28) featherTo(0.9, -10.6, 2.5, -11.6, 0.7, ember, edge);
     if (st >= 20) {
-      ctx.strokeStyle = "#e0a93c";
-      ctx.lineWidth = 0.9;
-      ctx.beginPath(); ctx.arc(0, 0.5, 2.3, 0.2, Math.PI * 1.7); ctx.stroke();
+      ctx.strokeStyle = gold;
+      ctx.lineWidth = 0.65;
+      ctx.beginPath(); ctx.arc(0, 0.6, 1.9, 0.4, Math.PI * 1.6); ctx.stroke();
     }
     if (state === State.PLAY && ghostPipesLeft > 0) {
       ctx.globalAlpha = 0.4;
       ctx.strokeStyle = "#e6ecff";
       ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 13.2, 0, Math.PI * 2); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     if (state === State.PLAY && shieldUp()) {
       ctx.strokeStyle = "rgba(190,230,255,0.9)";
       ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(0, 0, 14.5, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 13.8, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
-  function soarWing(sign, lift, wingC, wingD, gold, edge, st) {
+  function tailTrio(x, y, lift, ember, gold, wingC, edge) {
+    const sway = Math.sin(frame * 0.2) * 0.35;
+    const tips = [
+      [x - 2.5, y + 7.6, ember],
+      [x + sway * 0.2, y + 9.0, gold],
+      [x + 2.5, y + 7.4, wingC]
+    ];
+    for (let i = 0; i < tips.length; i++) {
+      const t = tips[i];
+      ctx.save();
+      ctx.strokeStyle = i === 1 ? "rgba(255,220,150,0.55)" : "rgba(255,140,60,0.4)";
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + (t[0] - x) * 0.4, y + 3.2, t[0] + sway, t[1]);
+      ctx.stroke();
+      ctx.restore();
+      featherTo(x, y, t[0] + sway, t[1], 1.05, t[2], edge);
+    }
+  }
+  function soarWing(sign, lift, wingC, wingD, gold, ember, edge) {
+    const up = Math.max(0, Math.min(1, lift));
     ctx.save();
-    ctx.translate(sign * 2.2, -2.6);
-    const sweep = 0.42 - lift * 0.38;
-    ctx.rotate(sign * -sweep);
     ctx.scale(sign, 1);
+    const sx = 1.45, sy = -2.3 - up * 1.8;
     ctx.beginPath();
-    ctx.moveTo(0, 0.2);
-    ctx.bezierCurveTo(3.2, -2.4, 7.4, -1.6, 10.2, 0.8);
-    ctx.bezierCurveTo(7.2, 1.8, 3.4, 1.5, 0, 0.7);
+    ctx.moveTo(sx, sy + 0.25);
+    ctx.bezierCurveTo(sx + 2.0, sy - 1.7 - up * 0.6, sx + 4.3, sy - 1.8 - up * 1.2, sx + 6.3, sy - 0.7 - up * 1.6);
+    ctx.bezierCurveTo(sx + 4.6, sy + 0.55 - up * 0.3, sx + 2.4, sy + 0.7, sx, sy + 0.75);
     ctx.closePath();
-    const cg = ctx.createLinearGradient(0, 0, 10, 0);
+    const cg = ctx.createLinearGradient(sx, sy, sx + 6, sy);
     cg.addColorStop(0, edge);
-    cg.addColorStop(1, wingC);
+    cg.addColorStop(0.6, wingC);
+    cg.addColorStop(1, ember);
     ctx.fillStyle = cg;
     ctx.fill();
     ctx.strokeStyle = edge;
-    ctx.lineWidth = 0.6;
+    ctx.lineWidth = 0.55;
     ctx.stroke();
-    const n = 4 + (st >= 18 ? 1 : 0);
-    const cols = [wingD, wingC, emberMix(wingC, gold), gold];
-    for (let i = 0; i < n; i++) {
-      ctx.save();
-      ctx.rotate(0.05 + i * 0.14);
-      soarFeather(Math.min(7.2 + i * 1.05, 11.6), 0.95 - i * 0.08, cols[i % cols.length], edge);
-      ctx.restore();
+    const wrist = [sx + 4.7, sy + 0.05 - up * 0.5];
+    const prim = [
+      [sx + 6.2, sy - 3.2 - up * 1.8, wingD, 1.0],
+      [sx + 7.6, sy - 1.8 - up * 1.6, wingC, 1.08],
+      [sx + 7.8, sy + 0.05 - up * 1.2, ember, 1.02],
+      [sx + 6.8, sy + 1.7 - up * 0.7, gold, 0.95]
+    ];
+    featherTo(sx + 1.6, sy + 0.35, sx + 3.3, sy + 1.15 - up * 0.4, 0.9, wingD, edge);
+    featherTo(sx + 3.1, sy + 0.1, sx + 5.1, sy + 0.55 - up * 0.6, 0.95, wingC, edge);
+    for (let i = 0; i < prim.length; i++) {
+      const q = prim[i];
+      featherTo(wrist[0], wrist[1], q[0], q[1], q[3], q[2], edge);
     }
     ctx.restore();
   }
-  function emberMix(a, b) { return mixHex(scHex(a), scHex(b), 0.45); }
+  /**
+   * Dedicated side-view climb. The body is drawn nose-up, wings raised, tail trailing.
+   * It is not the east sprite spun around, so the wing stays above the back.
+   */
+  function drawBirdPitch(pal, wingLift) {
+    const st = scStep(pal.evo);
+    const fk = evoFitBusy ? 1 : evoFit(pal);
+    const warm = (pal.species || "sparrow") === "sparrow" && pal.birdId === "bird_default";
+    const body = warm ? "#e0242c" : scHex(pal.body1);
+    const deep = warm ? "#6e0c16" : scHex(pal.body2);
+    const wingC = warm ? "#d32622" : scHex(pal.wing);
+    const wingD = warm ? "#8e1418" : scHex(pal.wingDark);
+    const gold = warm ? "#ffd36a" : scHex(pal.beak);
+    const ember = warm ? "#ff7a2a" : mixHex(scHex(pal.body1), scHex(pal.beak), 0.45);
+    const lift = Math.max(0, Math.min(1, wingLift || 0));
+    const edge = deep;
+    ctx.save();
+    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.0, BIRD_VISUAL_SCALE * fk * 2.0);
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    const glow = ctx.createRadialGradient(0, -1, 1, 0, 0, 13);
+    glow.addColorStop(0, warm ? "rgba(255,186,70,0.3)" : "rgba(255,255,255,0.13)");
+    glow.addColorStop(1, "rgba(255,80,20,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.ellipse(0.4, 0, 10, 13, 0, 0, Math.PI * 2); ctx.fill();
+    pitchFan(-0.3, -3.6, lift, 0.82, wingD, wingD, ember, gold, edge);
+    tailTrio(-1.05, 7.6, lift, ember, gold, wingC, edge);
+    ctx.beginPath();
+    ctx.moveTo(3.15, -12.2);
+    ctx.bezierCurveTo(0.9, -10.8, -0.15, -8.2, -0.85, -4.8);
+    ctx.bezierCurveTo(-1.7, -1.6, -2.15, 2.0, -1.85, 6.2);
+    ctx.bezierCurveTo(-1.55, 8.0, -1.15, 8.5, -0.7, 8.15);
+    ctx.bezierCurveTo(0.15, 6.4, 1.35, 3.2, 2.35, 0.2);
+    ctx.bezierCurveTo(3.35, -2.4, 4.05, -6.2, 4.15, -9.2);
+    ctx.bezierCurveTo(4.2, -10.8, 3.8, -11.8, 3.15, -12.2);
+    ctx.closePath();
+    const bg = ctx.createLinearGradient(-2, 2, 3.2, -4);
+    bg.addColorStop(0, deep);
+    bg.addColorStop(0.45, body);
+    bg.addColorStop(0.78, mixHex(body, "#fff4d8", 0.22));
+    bg.addColorStop(1, mixHex(body, gold, 0.2));
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = warm ? "rgba(255,198,96,0.8)" : (pal.belly || gold);
+    ctx.beginPath(); ctx.ellipse(1.7, -0.6, 1.25, 2.0, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,244,214,0.38)";
+    ctx.beginPath(); ctx.ellipse(-0.2, -3.2, 0.8, 2.3, -1.05, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = deep;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    pitchFan(-0.5, -4.4, lift, 1, wingC, wingD, ember, gold, edge);
+    featherTo(1.5, -9.6, -0.4, -12.8, 0.75, ember, edge);
+    featherTo(1.9, -10.1, 0.6, -14.2, 0.85, gold, edge);
+    featherTo(2.2, -9.5, 1.0, -11.4, 0.7, ember, edge);
+    if (st >= 18) featherTo(1.2, -9.1, -1.1, -10.6, 0.65, gold, edge);
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(2.55, -9.7, 1.7, 1.45, -0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = deep; ctx.lineWidth = 0.55; ctx.stroke();
+    ctx.fillStyle = "#fffdf6";
+    ctx.beginPath(); ctx.ellipse(3.15, -10.15, 0.68, 0.72, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = deep; ctx.lineWidth = 0.4; ctx.stroke();
+    ctx.fillStyle = "#1c1220";
+    ctx.beginPath(); ctx.arc(3.38, -10.1, 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(3.26, -10.26, 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(3.5, -10.55);
+    ctx.quadraticCurveTo(4.7, -12.3, 5.15, -12.55);
+    ctx.quadraticCurveTo(4.55, -11.55, 3.7, -10.15);
+    ctx.closePath();
+    ctx.fillStyle = gold; ctx.fill();
+    ctx.strokeStyle = deep; ctx.lineWidth = 0.45; ctx.stroke();
+    ctx.restore();
+  }
+  function pitchFan(x, y, lift, scale, wingC, wingD, ember, gold, edge) {
+    const up = Math.max(0, Math.min(1, lift));
+    const rise = 3.4 + up * 2.2;
+    const tips = [
+      [x - 5.4 * scale, y - rise * 0.15, wingD, 0.9],
+      [x - 3.2 * scale, y - rise - 0.4, wingC, 0.98],
+      [x - 0.4 * scale, y - rise - 1.6, ember, 1.05],
+      [x + 2.6 * scale, y - rise - 0.8, gold, 0.96],
+      [x + 4.8 * scale, y - rise * 0.25, wingC, 0.88]
+    ];
+    for (let i = 0; i < tips.length; i++) {
+      const t = tips[i];
+      featherTo(x, y, t[0], t[1], t[3] * scale, t[2], edge);
+    }
+  }
   function drawBirdFigureRaw(pal, wingAngle) {
     const evo = pal.evo;
     const birdId = pal.birdId;
@@ -12406,7 +12553,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       },
       clearMoment: function () { evoMoment = null; bigBannerT = 0; shopToast = 0; shopToastText = ""; },
       startFlip: function () { if (BIRD_FLIP) flipLeft = FLIP_FRAMES; return flipLeft; },
-      upPoseSheet: function (lift) {
+      poseSheet: function (kind, lift) {
         const c = document.createElement("canvas");
         c.width = 320; c.height = 420;
         const x = c.getContext("2d");
@@ -12414,11 +12561,16 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         try {
           x.fillStyle = "#4a2c34";
           x.fillRect(0, 0, 320, 420);
-          x.translate(160, 190);
+          x.translate(160, 188);
           x.scale(4.2, 4.2);
-          drawBirdUp(activeBirdPalette(evoPipes()), lift == null ? 0.25 : lift);
+          const pal = activeBirdPalette(evoPipes());
+          if (kind === "pitch") drawBirdPitch(pal, lift == null ? 0.2 : lift);
+          else drawBirdUp(pal, lift == null ? 0.2 : lift);
         } finally { ctx = prev; }
         return c.toDataURL("image/png");
+      },
+      upPoseSheet: function (lift) {
+        return window.SkyHopDebug.poseSheet("back", lift);
       },
       flipInfo: function () { return { on: BIRD_FLIP, left: flipLeft, ang: +flipAngle().toFixed(3) }; },
       setFlight: function (mode) {
