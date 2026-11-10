@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 35) — not uploaded
+
+versionName stays 1.21. versionCode 35. Nothing here is uploaded.
+
+## Bird art
+The climb and the side view use painted phoenix sprites. The body stays near the hit circle. The tail may extend past it. `BIRD_FLIP` still wraps the draw.
+
 # Sky Hop 1.21 revised test build (versionCode 34) — not uploaded
 
 versionName stays 1.21. versionCode 34. Nothing here is uploaded.

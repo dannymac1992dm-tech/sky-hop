@@ -8711,7 +8711,93 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     } catch (_) { k = 1; }
     evoFitMemo[key] = k; return k;
   }
+  // Painted phoenix sprites (code 35). The body stays near the hit circle; the tail may hang past it.
+  const PHOENIX_ART = {
+    side: { canvas: [1192, 738], anchor: [846, 395], drawW: 156, frames: [null, null, null] },
+    climb: { canvas: [843, 1135], anchor: [423, 269], drawW: 58, frames: [null, null, null] },
+    ready: false
+  };
+  (function loadPhoenixArt() {
+    let left = 6;
+    ["side", "climb"].forEach(function (kind) {
+      for (let i = 0; i < 3; i++) {
+        const img = new Image();
+        img.onload = function () {
+          PHOENIX_ART[kind].frames[i] = img;
+          if (--left === 0) PHOENIX_ART.ready = true;
+        };
+        img.src = "art/phoenix/" + kind + "-" + i + ".png?v=35";
+      }
+    });
+  })();
+  function phoenixTint(img, hex) {
+    const key = img.src + "|" + hex;
+    if (phoenixTint.cache[key]) return phoenixTint.cache[key];
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d");
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = "multiply";
+    g.globalAlpha = 0.4;
+    g.fillStyle = hex;
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "destination-in";
+    g.drawImage(img, 0, 0);
+    phoenixTint.cache[key] = c;
+    return c;
+  }
+  phoenixTint.cache = {};
+  function phoenixFrameSide(wingAngle) {
+    const u = Math.max(0, Math.min(1, ((wingAngle == null ? -0.2 : wingAngle) + 0.55) / 1.25));
+    if (u > 0.7) return 0;
+    if (u > 0.34) return 1;
+    if (u > 0.1) return 2;
+    return 0;
+  }
+  function phoenixFrameClimb(lift) {
+    const u = Math.max(0, Math.min(1, lift || 0));
+    if (u > 0.7) return 0;
+    if (u > 0.28) return 2;
+    return 1;
+  }
+  function drawPhoenixSprite(kind, index, pal) {
+    const spec = PHOENIX_ART[kind];
+    let img = spec.frames[index] || spec.frames[1] || spec.frames[0];
+    if (!img) return false;
+    const warm = (pal.species || "sparrow") === "sparrow" && (pal.birdId || "bird_default") === "bird_default";
+    if (!warm && pal.body1) img = phoenixTint(img, scHex(pal.body1));
+    const st = scStep(pal && pal.evo);
+    const scale = spec.drawW / spec.canvas[0];
+    const w = spec.canvas[0] * scale, h = spec.canvas[1] * scale;
+    const ax = spec.anchor[0] * scale, ay = spec.anchor[1] * scale;
+    if (st > 6) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.22, 0.04 + st * 0.006);
+      ctx.fillStyle = "#ffb03a";
+      ctx.beginPath(); ctx.ellipse(0, 2, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.drawImage(img, -ax, -ay, w, h);
+    ctx.save();
+    for (let i = 0; i < 4; i++) {
+      const t = (frame * 0.12 + i * 0.27) % 1;
+      ctx.globalAlpha = 0.45 * (1 - t);
+      ctx.fillStyle = i % 2 ? "#ffe08a" : "#ff7a2a";
+      ctx.beginPath();
+      if (kind === "side") ctx.arc(-22 - t * 36, 4 + Math.sin(frame * 0.25 + i) * 5, 1.1, 0, Math.PI * 2);
+      else ctx.arc(Math.sin(frame * 0.22 + i) * 4, 20 + t * 40, 1.15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return true;
+  }
   function drawBirdFigure(pal, wingAngle) {
+    if (PHOENIX_ART.ready) {
+      if (!evoFitBusy) evoFitLast = evoFit(pal);
+      drawPhoenixSprite("side", phoenixFrameSide(wingAngle), pal);
+      return;
+    }
     ctx.save();
     const fk = evoFitBusy ? 1 : evoFit(pal); evoFitLast = fk;
     ctx.scale(BIRD_VISUAL_SCALE * fk, BIRD_VISUAL_SCALE * fk);
@@ -9313,6 +9399,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     flamePlume(0.6, 6.4, 1.75, 11.7, 1.15, C);
   }
   function drawBirdUp(pal, wingLift) {
+    if (PHOENIX_ART.ready) {
+      drawPhoenixSprite("climb", phoenixFrameClimb(wingLift), pal);
+      if (state === State.PLAY && shieldUp()) {
+        ctx.strokeStyle = "rgba(190,230,255,0.9)";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
+      }
+      return;
+    }
     const st = scStep(pal.evo);
     const fk = evoFitBusy ? 1 : evoFit(pal);
     const C = hawkPaint(pal);
