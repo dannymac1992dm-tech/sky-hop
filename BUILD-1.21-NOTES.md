@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 31) — not uploaded
+
+versionName stays 1.21. versionCode 31. Nothing here is uploaded.
+
+## Climb pose
+The climb bird is drawn from behind with a tapered back, a swept crest, layered wing feathers, and three ember tail streamers. It replaces the capsule pose from code 30. The side view is unchanged. `BIRD_FLIP` is unchanged.
+
 # Sky Hop 1.21 revised test build (versionCode 30) — not uploaded
 
 versionName stays 1.21. versionCode 30. Nothing here is uploaded.
