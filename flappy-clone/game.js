@@ -11650,16 +11650,42 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     viewAng += (target - viewAng) * 0.045;
     if (Math.abs(target - viewAng) < 0.004) viewAng = target;
   }
-  function applyCourseCamera() {
+  function courseScale() {
+    return 1 + (W / PLAY_H - 1) * northAmt();
+  }
+  /** Screen point the bird occupies. East keeps the course position. A climb sits low, nose toward the landmark. */
+  function birdScreenPos() {
     const k = northAmt();
-    const fit = W / PLAY_H;
-    const s = 1 + (fit - 1) * k;
-    const psx = bird.x + (W * 0.5 - bird.x) * k;
-    const psy = bird.y + (PLAY_H * 0.70 - bird.y) * k;
-    ctx.translate(psx, psy);
+    return {
+      x: bird.x + (W * 0.5 - bird.x) * k,
+      y: bird.y + (PLAY_H * 0.82 - bird.y) * k
+    };
+  }
+  function applyCourseCamera() {
+    const p = birdScreenPos();
+    const s = courseScale();
+    ctx.translate(p.x, p.y);
     ctx.rotate(viewAng);
     ctx.scale(s, s);
     ctx.translate(-bird.x, -bird.y);
+  }
+  /**
+   * Draw the phoenix in screen space. The art faces course +x.
+   * viewAng turns that nose onto the line of flight (right while cruising, up while climbing).
+   * bird.rot is applied inside drawBird after this, so a flap still tips the nose relative to the heading.
+   * Uniform scale only, so the crest and wings are not mirrored or squashed. The hit circle stays at the center.
+   */
+  function drawBirdHeading() {
+    const p = birdScreenPos();
+    const s = courseScale();
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(viewAng);
+    ctx.scale(s, s);
+    ctx.translate(-bird.x, -bird.y);
+    if (state !== State.START) drawPuModeBack();
+    drawBird();
+    ctx.restore();
   }
   const MARK = {
     day: ["Ember Citadel", "#ffb15a", "#6a2844"],
@@ -11804,11 +11830,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state !== State.START) { drawCoins(); drawPowerups(); drawPathfinder(); drawBlackHoles(); drawShipRockets(); }
     drawWorldExtras("fg");
     drawBurstFx(); drawPuPop();
-    if (state === State.START) drawBird();
-    else { drawPuModeBack(); drawBird(); drawWarpFlash(); }
+    if (state !== State.START) drawWarpFlash();
     drawParticles();
     ctx.restore();
     ctx.restore();
+    drawBirdHeading();
     bird.y = by;
     drawBossOverlay();
 

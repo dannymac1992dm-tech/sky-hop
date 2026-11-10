@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 29) — not uploaded
+
+versionName stays 1.21. versionCode 29. Nothing here is uploaded.
+
+## Bird heading
+The phoenix is drawn on the line of flight. East, the beak points right. Through a bank it turns with the camera. On a climb the beak points up and the tail points down. A flap still tips the nose relative to that heading. The hit circle stays on the center. Shots leave from the beak along the heading.
+
 # Sky Hop 1.21 revised test build (versionCode 28) — not uploaded
 
 versionName stays 1.21. versionCode 28. Nothing here is uploaded.
