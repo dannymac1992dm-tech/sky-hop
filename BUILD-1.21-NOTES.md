@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 33) — not uploaded
+
+versionName stays 1.21. versionCode 33. Nothing here is uploaded.
+
+## Climb pose
+The glide wings are layered feathers, and the tail is a short flame on both the climb and the side view. The hit circle is unchanged. `BIRD_FLIP` is unchanged.
+
 # Sky Hop 1.21 revised test build (versionCode 32) — not uploaded
 
 versionName stays 1.21. versionCode 32. Nothing here is uploaded.
