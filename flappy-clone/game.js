@@ -9196,74 +9196,59 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.bezierCurveTo(L * 0.35, -w * 0.06, L * 0.7, -w * 0.03, L * 0.86, 0);
     ctx.stroke();
   }
+  /** One crescent wing. A single outline, thick at the shoulder and pinched to one tip. */
+  function traceCrescent(span, bend) {
+    const tipX = span * 0.9;
+    const tipY = 2.8 + bend;
+    ctx.beginPath();
+    ctx.moveTo(1.15, -0.7);
+    ctx.bezierCurveTo(span * 0.28, -3.4 - bend * 0.2, span * 0.62, -2.2 - bend * 0.55, tipX - 1.1, tipY - 2.05);
+    ctx.lineTo(tipX, tipY);
+    ctx.bezierCurveTo(tipX - 2.8, tipY + 0.85, span * 0.48, 4.15 + bend * 0.12, span * 0.3, 3.35);
+    ctx.quadraticCurveTo(span * 0.22, 2.55, 3.5, 2.85);
+    ctx.quadraticCurveTo(2.3, 1.7, 1.45, 1.2);
+    ctx.quadraticCurveTo(1.1, 0.25, 1.15, -0.7);
+    ctx.closePath();
+  }
   function hawkWing(sign, lift, C) {
     const up = Math.max(0, Math.min(1, lift || 0));
-    const span = 16.6 * (1 - up * 0.12);
-    const rise = up * 1.45;
-    const k = span / 16.6;
+    const span = 15.2 * (1 - up * 0.08);
+    const bend = 1.5 - up * 3.4;
+    const tipX = span * 0.9;
+    const tipY = 2.8 + bend;
     ctx.save();
     ctx.scale(sign, 1);
-    ctx.translate(0, -rise * 0.45);
-    const secs = [
-      [2.0, 0.7, 0.78, 5.2, 2.05, C.wingD],
-      [4.4, 0.85, 0.66, 5.0, 1.95, C.wingC],
-      [6.7, 1.0, 0.56, 4.8, 1.85, C.body],
-      [8.9, 1.15, 0.46, 4.5, 1.7, C.ember]
-    ];
-    for (let i = 0; i < secs.length; i++) {
-      const s = secs[i];
-      ctx.save();
-      ctx.translate(s[0] * k, s[1]);
-      ctx.rotate(s[2]);
-      broadFeather(s[3] * k, s[4], s[5], C.deep);
-      ctx.restore();
-    }
-    const prim = [
-      [-0.52, 1.0, 1.7, C.wingD],
-      [-0.14, 1.06, 1.6, C.wingC],
-      [0.24, 1.02, 1.5, C.ember],
-      [0.62, 0.92, 1.4, C.gold]
-    ];
-    for (let i = 0; i < prim.length; i++) {
-      const p = prim[i];
-      ctx.save();
-      ctx.translate(span * 0.56, 0.25);
-      ctx.rotate(p[0]);
-      broadFeather(span * 0.48 * p[1], p[2], p[3], C.deep);
-      ctx.restore();
-    }
-    ctx.beginPath();
-    ctx.moveTo(1.25, -1.4);
-    ctx.bezierCurveTo(span * 0.26, -2.45 - rise * 0.35, span * 0.52, -1.65 - rise * 0.45, span * 0.7, -0.2);
-    ctx.quadraticCurveTo(span * 0.58, 0.95, span * 0.34, 1.2);
-    ctx.quadraticCurveTo(span * 0.18, 0.25, 1.25, -1.4);
-    ctx.closePath();
-    const cg = ctx.createLinearGradient(1, -1, span * 0.6, 0.4);
-    cg.addColorStop(0, C.deep);
-    cg.addColorStop(0.45, C.wingC);
-    cg.addColorStop(1, mixHex(C.wingC, C.gold, 0.12));
-    ctx.fillStyle = cg;
+    traceCrescent(span, bend);
+    const g = ctx.createLinearGradient(1.2, -2, tipX, tipY);
+    g.addColorStop(0, C.deep);
+    g.addColorStop(0.4, C.wingC);
+    g.addColorStop(0.8, C.body);
+    g.addColorStop(1, mixHex(C.wingC, C.gold, 0.4));
+    ctx.fillStyle = g;
     ctx.fill();
     ctx.save();
     ctx.clip();
-    ctx.strokeStyle = mixHex(C.gold, C.lite, 0.15);
-    ctx.lineWidth = 0.85;
-    ctx.globalAlpha = 0.9;
-    for (let i = 0; i < 3; i++) {
+    ctx.lineCap = "round";
+    ctx.strokeStyle = C.gold;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 5; i++) {
+      const y0 = -0.35 + i * 0.38;
       ctx.beginPath();
-      ctx.moveTo(2.0, -0.55 + i * 0.62);
-      ctx.quadraticCurveTo(span * 0.32, -1.05 + i * 0.55, span * 0.58, -0.25 + i * 0.42);
+      ctx.moveTo(2.0, y0);
+      ctx.bezierCurveTo(span * 0.34, y0 - 1.5 - bend * 0.1, span * 0.62, tipY - 1.3 + i * 0.18, tipX - 1.8, tipY - 0.35 + i * 0.04);
       ctx.stroke();
     }
     ctx.restore();
+    traceCrescent(span, bend);
     ctx.strokeStyle = C.deep;
-    ctx.lineWidth = 0.65;
+    ctx.lineWidth = 1.05;
     ctx.stroke();
-    ctx.strokeStyle = "rgba(255,236,190,0.88)";
-    ctx.lineWidth = 0.55;
+    ctx.strokeStyle = "rgba(255,236,190,0.85)";
+    ctx.lineWidth = 0.42;
     ctx.beginPath();
-    ctx.moveTo(2.0, -1.05);
-    ctx.bezierCurveTo(span * 0.28, -1.95, span * 0.52, -1.25, span * 0.66, -0.15);
+    ctx.moveTo(2.1, -0.4);
+    ctx.bezierCurveTo(span * 0.32, -2.4 - bend * 0.12, span * 0.64, -1.3 - bend * 0.3, tipX - 1.6, tipY - 1.5);
     ctx.stroke();
     ctx.restore();
   }
@@ -9314,9 +9299,18 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
   function hawkTail(C) {
     const sway = Math.sin(frame * 0.3);
-    flamePlume(-0.15, 3.5, -2.3, 11.4, 1.45, C);
-    flamePlume(0, 3.3, sway * 0.35, 13.4, 1.7, C);
-    flamePlume(0.15, 3.5, 2.35, 11.6, 1.45, C);
+    const fans = [[-2.4, 6.9], [-0.8, 7.5], [0.85, 7.5], [2.45, 6.9]];
+    for (let i = 0; i < fans.length; i++) {
+      const tip = fans[i];
+      ctx.save();
+      ctx.translate(tip[0] * 0.15, 3.15);
+      ctx.rotate(Math.atan2(tip[1] - 3.15, tip[0] - tip[0] * 0.15));
+      broadFeather(Math.hypot(tip[0] - tip[0] * 0.15, tip[1] - 3.15), 0.85, i % 2 ? C.wingC : C.body, C.deep);
+      ctx.restore();
+    }
+    flamePlume(-0.55, 6.4, -1.7, 11.6 + sway * 0.2, 1.15, C);
+    flamePlume(0, 6.7, sway * 0.3, 13.1, 1.35, C);
+    flamePlume(0.6, 6.4, 1.75, 11.7, 1.15, C);
   }
   function drawBirdUp(pal, wingLift) {
     const st = scStep(pal.evo);
@@ -9324,7 +9318,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const C = hawkPaint(pal);
     const lift = Math.max(0, Math.min(1, wingLift || 0));
     ctx.save();
-    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.25, BIRD_VISUAL_SCALE * fk * 2.25);
+    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.15, BIRD_VISUAL_SCALE * fk * 2.15);
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     const glow = ctx.createRadialGradient(0, 1, 1, 0, 2, 12);
@@ -9337,11 +9331,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     hawkWing(1, lift, C);
     function traceUpBody() {
       ctx.beginPath();
-      ctx.moveTo(0, -5.15);
-      ctx.bezierCurveTo(1.45, -4.85, 1.85, -2.7, 1.65, -0.2);
-      ctx.bezierCurveTo(1.45, 1.9, 1.05, 3.35, 0.1, 4.25);
-      ctx.bezierCurveTo(-1.05, 3.35, -1.45, 1.9, -1.65, -0.2);
-      ctx.bezierCurveTo(-1.85, -2.7, -1.45, -4.85, 0, -5.15);
+      ctx.moveTo(0, -5.6);
+      ctx.bezierCurveTo(1.05, -5.2, 1.35, -2.8, 1.2, -0.3);
+      ctx.bezierCurveTo(1.05, 1.6, 0.75, 3.1, 0.08, 3.9);
+      ctx.bezierCurveTo(-0.75, 3.1, -1.05, 1.6, -1.2, -0.3);
+      ctx.bezierCurveTo(-1.35, -2.8, -1.05, -5.2, 0, -5.6);
       ctx.closePath();
     }
     traceUpBody();

@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 34) — not uploaded
+
+versionName stays 1.21. versionCode 34. Nothing here is uploaded.
+
+## Climb pose
+Each climb wing is one crescent that tapers to a point. A short feather fan leads into the flame tail. The hit circle is unchanged. `BIRD_FLIP` is unchanged.
+
 # Sky Hop 1.21 revised test build (versionCode 33) — not uploaded
 
 versionName stays 1.21. versionCode 33. Nothing here is uploaded.
