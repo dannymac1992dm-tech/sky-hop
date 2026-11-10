@@ -2113,6 +2113,9 @@
   let viewAng = 0;       // 0 east, -PI/2 north. Eased. Physics stay in course space.
   let flightLock = null; // debug: hold a heading for a screenshot
   let flightCueAt = -1;
+  const BIRD_FLIP = true; // one switch. False skips the flourish entirely.
+  const FLIP_FRAMES = 24; // about 0.4s
+  let flipLeft = 0;
   let recoveryExtra = 0;
 
   // —— Extras world entities ——
@@ -6156,6 +6159,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     viewAng = 0;
     flightLock = null;
     flightCueAt = -1;
+    flipLeft = 0;
     recoveryExtra = 0;
     heldWeapon = null;
     weaponFiring = false; keyFire = false; fireIds.clear(); fireCd = 0;
@@ -7285,6 +7289,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (leg && leg.cue) {
       const sub = np.beatCue || (leg.turn === "north" ? "The path bends upward" : leg.dir === "north" ? "Landmark ahead" : "The path levels out");
       showBigBanner(leg.cue, sub, "#ffe7b0");
+      if (BIRD_FLIP && flipLeft <= 0) flipLeft = FLIP_FRAMES;
     }
     else if (np.beatCue) showBigBanner(np.beatCue, np.beatRole === "challenge" ? "Short section" : "Easy stretch", np.beatRole === "reward" ? "#ffe08a" : "#ffffff");
     np.pattern = built.pattern;
@@ -8993,26 +8998,149 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
     ctx.restore();
   }
-  /** Detailed flight feathers. Same shoulder pivot as the old wing, so flap timing is unchanged. */
+  /** One separated flight feather. Length stays short so the bird's footprint does not grow. */
+  function quillAlong(len, hw, fill, ol) {
+    const dir = len < 0 ? -1 : 1;
+    const L = Math.max(4, Math.abs(len));
+    const w = Math.max(0.7, hw);
+    ctx.save();
+    if (dir < 0) ctx.scale(-1, 1);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(L * 0.42, -w, L, -w * 0.15);
+    ctx.quadraticCurveTo(L * 0.72, w * 0.15, L * 0.55, w * 0.72);
+    ctx.quadraticCurveTo(L * 0.22, w * 0.55, 0, 0);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.fillStyle = "rgba(20,8,16,0.22)";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(L * 0.92, 0);
+    ctx.lineTo(L * 0.5, w * 0.7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(0.6, 0);
+    ctx.lineTo(L * 0.86, -w * 0.05);
+    ctx.stroke();
+    ctx.strokeStyle = ol || "rgba(40,12,12,0.8)";
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(L * 0.42, -w, L, -w * 0.15);
+    ctx.quadraticCurveTo(L * 0.72, w * 0.15, L * 0.55, w * 0.72);
+    ctx.quadraticCurveTo(L * 0.22, w * 0.55, 0, 0);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+  /** Side-view wing: layered primaries and secondaries, swept back, still inside the old wing length. */
   function drawFeatheredWing(pal, g, wingAngle, warm, C) {
     ctx.save();
-    ctx.translate(3, 3);
-    ctx.rotate(Math.PI + 0.2 + wingAngle * 0.9);
-    const L = g.wing[0];
+    ctx.translate(2, 1);
+    ctx.rotate(Math.PI + 0.35 + wingAngle * 0.85);
+    const L = Math.min(g.wing[0], 14);
     const ol = C.wingLine;
-    const gold = mixHex(scHex(pal.wing), "#ffe08a", warm ? 0.15 : 0.35);
-    const feathers = [
-      [2, 1.2, L * 1.05, g.wing[1] * 1.55, 3.3, warm ? "#c81e22" : pal.wingDark],
-      [1, 0.2, L * 1.18, g.wing[1] * 0.45, 3.4, warm ? "#ff4a24" : pal.wing],
-      [0, -1.1, L * 1.08, -g.wing[1] * 0.5, 3.2, warm ? "#ffb13a" : gold],
-      [-1, -2.2, L * 0.92, -g.wing[1] * 1.5, 2.9, warm ? "#ffe08a" : mixHex(scHex(pal.wing), "#ffffff", 0.45)],
-    ];
-    const extra = Math.min(2, g.tips | 0);
-    if (extra >= 1) feathers.push([3, 2.2, L * 0.82, g.wing[1] * 2.05, 2.4, warm ? "#9a1418" : pal.wingDark]);
-    if (extra >= 2) feathers.push([-1, -3.2, L * 0.72, -g.wing[1] * 2.0, 2.3, warm ? "#fff4c4" : mixHex(scHex(pal.wing), "#ffffff", 0.55)]);
-    for (let i = 0; i < feathers.length; i++) {
-      const f = feathers[i];
-      blade(f[0], f[1], f[4], f[2], f[3], f[5], ol, 1.15);
+    const cols = warm
+      ? ["#8e1418", "#d32622", "#ff6a28", "#ffd56a"]
+      : [pal.wingDark, pal.wing, mixHex(scHex(pal.wing), "#ffffff", 0.28), scHex(pal.beak)];
+    const n = 4 + (g.tips > 3 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      ctx.save();
+      ctx.rotate(-0.42 + i * 0.2);
+      quillAlong(L * (0.62 + i * 0.08), 1.15 + (n - i) * 0.12, cols[i % cols.length], ol);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+  /** Climb pose: seen from behind, flying away. Head and crest at the top, both wings out, tail centered below. */
+  function drawBirdUp(pal, wingLift) {
+    const st = scStep(pal.evo);
+    const fk = evoFitBusy ? 1 : evoFit(pal);
+    const warm = (pal.species || "sparrow") === "sparrow" && pal.birdId === "bird_default";
+    const body = scHex(pal.body1);
+    const edge = scHex(pal.body2);
+    const wing = scHex(pal.wing);
+    const wingD = scHex(pal.wingDark);
+    const gold = warm ? "#ffd56a" : scHex(pal.beak);
+    const crestN = Math.min(5, 3 + Math.floor(st / 8));
+    const tailN = 3 + Math.min(3, Math.floor(st / 8));
+    ctx.save();
+    // Match the side-view bird's on-screen size. The raw up drawing is compact, so this
+    // scale only brings the crest, wings and tail up to that same small footprint.
+    ctx.scale(BIRD_VISUAL_SCALE * fk * 2.45, BIRD_VISUAL_SCALE * fk * 2.45);
+    if (warm) {
+      const A = Math.min(0.45, 0.16 + 0.01 * st);
+      const fg = ctx.createRadialGradient(0, 0, 2, 0, 0, 18);
+      fg.addColorStop(0, "rgba(255,220,120," + A.toFixed(2) + ")");
+      fg.addColorStop(1, "rgba(255,80,20,0)");
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.ellipse(0, 1, 16, 18, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (pal.glow) {
+      ctx.fillStyle = pal.glow;
+      ctx.beginPath(); ctx.ellipse(0, 1, 14, 16, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < tailN; i++) {
+      const t = tailN === 1 ? 0 : (i / (tailN - 1) - 0.5);
+      ctx.save();
+      ctx.translate(0, 7);
+      ctx.rotate(t * 0.55);
+      quillAlong(9 + (i % 2) + Math.min(3, st * 0.08), 1.35, i % 2 ? gold : (warm ? "#e8442a" : wing), edge);
+      ctx.restore();
+    }
+    const lift = Math.max(0, Math.min(1, wingLift || 0)) * 0.65;
+    drawUpWing(-1, lift, wing, wingD, gold, edge, st);
+    drawUpWing(1, lift, wing, wingD, gold, edge, st);
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(0, 1, 4.6, 7.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = edge; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = warm ? "rgba(255,210,110,0.9)" : pal.belly;
+    ctx.beginPath(); ctx.ellipse(0, 2.4, 2.2, 2.8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, -7.2, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = edge; ctx.stroke();
+    ctx.fillStyle = gold;
+    ctx.beginPath(); ctx.moveTo(0, -12.2); ctx.lineTo(1.5, -9.2); ctx.lineTo(-1.5, -9.2); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < crestN; i++) {
+      const t = crestN === 1 ? 0 : (i / (crestN - 1) - 0.5);
+      ctx.save();
+      ctx.translate(t * 2.4, -9.2);
+      ctx.rotate(Math.PI + t * 0.35);
+      quillAlong(5.5 + (1 - Math.abs(t)) * 1.4, 1.05, i % 2 ? gold : (warm ? "#ff7a1c" : wing), edge);
+      ctx.restore();
+    }
+    if (st >= 20) {
+      ctx.strokeStyle = "#e0a93c"; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(0, 1, 3.2, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (state === State.PLAY && ghostPipesLeft > 0) {
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = "#e6ecff";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (state === State.PLAY && shieldUp()) {
+      ctx.strokeStyle = "rgba(190,230,255,0.9)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawUpWing(sign, lift, wing, wingD, gold, edge, st) {
+    ctx.save();
+    ctx.translate(sign * 3, -0.5);
+    ctx.rotate(sign < 0 ? lift : -lift);
+    const n = 4 + (st >= 16 ? 1 : 0);
+    const cols = [wingD, wing, gold, wing];
+    for (let i = 0; i < n; i++) {
+      ctx.save();
+      ctx.rotate(sign * (-0.15 + i * 0.16));
+      quillAlong(sign * (7.2 + i * 1.15), 1.05, cols[i % cols.length], edge);
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -11638,6 +11766,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     return Math.max(0, Math.min(1, -viewAng / (Math.PI / 2)));
   }
   function tickFlight() {
+    if (flipLeft > 0) flipLeft--;
     if (flightLock != null) { viewAng = flightLock; return; }
     const O = window.SkyHopObstacles;
     if (!O || !O.flightLeg) return;
@@ -11649,6 +11778,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const target = leg.ang;
     viewAng += (target - viewAng) * 0.045;
     if (Math.abs(target - viewAng) < 0.004) viewAng = target;
+  }
+  function upBlend() {
+    const k = northAmt();
+    if (k <= 0.12) return 0;
+    if (k >= 0.72) return 1;
+    const t = (k - 0.12) / 0.6;
+    return t * t * (3 - 2 * t);
+  }
+  function flipAngle() {
+    if (!BIRD_FLIP || flipLeft <= 0) return 0;
+    const u = 1 - flipLeft / FLIP_FRAMES;
+    const e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    return -Math.PI * 2 * e;
   }
   function courseScale() {
     return 1 + (W / PLAY_H - 1) * northAmt();
@@ -11678,13 +11820,36 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawBirdHeading() {
     const p = birdScreenPos();
     const s = courseScale();
+    const up = upBlend();
+    const spin = flipAngle();
+    const pal = activeBirdPalette(evoPipes());
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.rotate(viewAng);
-    ctx.scale(s, s);
-    ctx.translate(-bird.x, -bird.y);
-    if (state !== State.START) drawPuModeBack();
-    drawBird();
+    if (spin) ctx.rotate(spin);
+    if (up < 0.995) {
+      ctx.save();
+      ctx.globalAlpha *= (1 - up);
+      ctx.rotate(viewAng * (1 - up));
+      ctx.scale(s, s);
+      ctx.translate(-bird.x, -bird.y);
+      if (state !== State.START) drawPuModeBack();
+      drawBird();
+      ctx.restore();
+    }
+    if (up > 0.005) {
+      ctx.save();
+      ctx.globalAlpha *= up;
+      ctx.scale(s, s);
+      if (state === State.PLAY && puMagnetFrames > 0) {
+        ctx.strokeStyle = "#ff7fb0";
+        ctx.lineWidth = 2;
+        ctx.globalAlpha *= 0.85;
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = up;
+      }
+      drawBirdUp(pal, bird.wing);
+      ctx.restore();
+    }
     ctx.restore();
   }
   const MARK = {
@@ -12145,6 +12310,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         return { ang: +viewAng.toFixed(3), north: +northAmt().toFixed(3), gi: gi, leg: leg, lock: flightLock };
       },
       clearMoment: function () { evoMoment = null; bigBannerT = 0; shopToast = 0; shopToastText = ""; },
+      startFlip: function () { if (BIRD_FLIP) flipLeft = FLIP_FRAMES; return flipLeft; },
+      flipInfo: function () { return { on: BIRD_FLIP, left: flipLeft, ang: +flipAngle().toFixed(3) }; },
       setFlight: function (mode) {
         if (mode === "north") flightLock = -Math.PI / 2;
         else if (mode === "turn") flightLock = -Math.PI / 4;

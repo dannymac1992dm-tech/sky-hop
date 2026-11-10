@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 30) — not uploaded
+
+versionName stays 1.21. versionCode 30. Nothing here is uploaded.
+
+## Upward pose
+A climb draws the phoenix from behind: crest and beak at the top, both wings out to the sides, tail centered below. The wings are short layered feathers, on the side view as well. A bank crossfades from the side view into that pose. A tap while climbing beats the wings instead of tipping the body. `BIRD_FLIP` (default on) plays one short backward loop at the start of each bank. The hit circle is unchanged.
+
 # Sky Hop 1.21 revised test build (versionCode 29) — not uploaded
 
 versionName stays 1.21. versionCode 29. Nothing here is uploaded.
