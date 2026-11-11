@@ -2144,6 +2144,7 @@
   // —— Parallax ——
   let groundX = 0;
   let cloudX = 0;
+  let paintScroll = 0;
   let hillX = 0;
   let lastScrollMul = 0.35;
   const GROUND_TILE = 480; // multiple of the 48px stripe; pebbles repeat every 480px
@@ -3265,10 +3266,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     cane: { crack: "rgba(200,30,70,0.9)", hi: "rgba(255,255,255,0.95)", chip: "shard", cols: ["#ffffff", "#e8344f"], glow: null }
   };
   function obstFx(p) { const d = pipeStyleDef(p.style == null ? 0 : p.style); return OBST_FX[d && d.deco] || OBST_FX.tube; }
-  function chunkFx(x, y, n, fx, up) {
+  function chunkFx(x, y, n, fx, up, art) {
     for (let i = 0; i < n && chunks.length < CHUNK_CAP; i++) {
       const a = Math.random() * Math.PI * 2, sp = 0.8 + Math.random() * 2.6;
-      chunks.push({ x: x + (Math.random() - 0.5) * 18, y: y + (Math.random() - 0.5) * 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.2 + (up || 0), rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4, life: 26 + (Math.random() * 18 | 0), max: 44, s: 3 + Math.random() * 3.4, c: fx.cols[i % 2], k: fx.chip });
+      chunks.push({ x: x + (Math.random() - 0.5) * 18, y: y + (Math.random() - 0.5) * 10, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.2 + (up || 0), rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4, life: 26 + (Math.random() * 18 | 0), max: 44, s: 3 + Math.random() * 3.4, c: fx.cols[i % 2], k: fx.chip, art: art || "", su: Math.random(), sv: Math.random() });
     }
   }
   /** height of the regrown stump on a crumbled half (0 when none): grows in over about half a second */
@@ -3346,7 +3347,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       const a = -1.1 + Math.random() * 2.2;
       addParticle(q.x, q.y, Math.cos(a) * 3.4, Math.sin(a) * 3.4 - 0.4, 8 + Math.random() * 8, 14, i % 2 ? "#fff4c8" : "#ffb15a", 1.3);
     }
-    chunkFx(q.x, q.y, 10, fxo, 0);
+    chunkFx(q.x, q.y, 10, fxo, 0, obstacleArtName(bit.kind, worldDefAt(p.wi || 0).id));
     smokeFx(q.x, q.y, 6, 16);
     confettiBurst(q.x, q.y, 22);
     wHit(w || "pellet", q.x, q.y, true);
@@ -3369,7 +3370,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     poofFx(x, y, false);
     wHit(w, x, y, w === "rocket");
     if (bit.hp >= pipeHp()) crumblePipe(p, side, w);
-    else { chunkFx(x, y, 3, bitFx(bit), 0); beep(300 + Math.random() * 60, 0.04, "square", 0.02); }
+    else { chunkFx(x, y, 3, bitFx(bit), 0, obstacleArtName(bit.kind, worldDefAt(p.wi || 0).id)); beep(300 + Math.random() * 60, 0.04, "square", 0.02); }
     return true;
   }
   function crackPipesNear(x, y, R, dmg) {
@@ -3823,6 +3824,16 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawChunks() {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]; ctx.globalAlpha = Math.min(1, c.life / 14); ctx.fillStyle = c.c; ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+      const img = c.art && OBST_ART[c.art];
+      if (img && img.complete && img.naturalWidth) {
+        const s = c.s * 2.4;
+        const sw = img.width * 0.28, sh = img.height * 0.28;
+        const sx = Math.max(0, Math.min(img.width - sw, c.su * (img.width - sw)));
+        const sy = Math.max(0, Math.min(img.height - sh, c.sv * (img.height - sh)));
+        ctx.drawImage(img, sx, sy, sw, sh, -s, -s, s * 2, s * 2);
+        ctx.restore();
+        continue;
+      }
       const s = c.s; ctx.beginPath();
       if (c.k === "shard") { ctx.moveTo(0, -s); ctx.lineTo(s * 0.7, s * 0.8); ctx.lineTo(-s * 0.7, s * 0.6); ctx.closePath(); }
       else if (c.k === "brick") ctx.rect(-s * 0.8, -s * 0.55, s * 1.6, s * 1.1);
@@ -4729,9 +4740,89 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     });
   }
 
+  const REALM_IDS = ["day", "desert", "snow", "city", "space", "blossom", "reef", "volcano", "candy"];
+  const REALM_ART = {};
+  const OBST_NAMES = ["boulder", "amber", "ruin", "ice", "moss", "lava"];
+  const OBST_ART = {};
+  (function loadPaintedArt() {
+    REALM_IDS.forEach(function (id) {
+      ["", "-far"].forEach(function (suf) {
+        const img = new Image();
+        img.onload = function () { REALM_ART[id + suf] = img; };
+        img.src = "art/realms/" + id + suf + ".webp?v=37";
+      });
+    });
+    OBST_NAMES.forEach(function (name) {
+      const img = new Image();
+      img.onload = function () { OBST_ART[name] = img; };
+      img.src = "art/obstacles/" + name + ".webp?v=37";
+    });
+  })();
+  function paintedReady(id) {
+    const img = REALM_ART[id || "day"];
+    return !!(img && img.complete && img.naturalWidth);
+  }
+  function obstacleArtName(kind, worldId) {
+    if (kind === "lavabomb" || (worldId === "volcano" && (kind === "rock" || kind === "tri" || kind === "debris"))) return "lava";
+    if (kind === "ice" || kind === "snowball" || ((worldId === "snow" || worldId === "space") && kind === "crystal")) return "ice";
+    if (kind === "crystal" || kind === "gumdrop" || kind === "kite") return "amber";
+    if (kind === "gear" || kind === "sign" || kind === "anvil" || kind === "slab") return "ruin";
+    if (kind === "petal" || kind === "log" || kind === "coral" || kind === "shell" || kind === "lantern" || kind === "cactusball" || kind === "buoy") return "moss";
+    return "boulder";
+  }
+  function obstacleImage(kind, wi) {
+    const id = worldDefAt(wi || 0).id;
+    const img = OBST_ART[obstacleArtName(kind, id)];
+    return img && img.complete && img.naturalWidth ? img : null;
+  }
+  function drawMirroredStrip(img, dw, dh, scroll, y) {
+    const period = dw * 2;
+    const sc = ((scroll % period) + period) % period;
+    let x = -sc;
+    let i = 0;
+    while (x < W + 1 && i < 6) {
+      ctx.save();
+      if (i % 2) {
+        ctx.translate(x + dw, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0, dw, dh);
+      } else ctx.drawImage(img, x, y, dw, dh);
+      ctx.restore();
+      x += dw;
+      i++;
+    }
+  }
+  function drawPaintedSky(d) {
+    const near = REALM_ART[d.id];
+    if (!near || !near.complete || !near.naturalWidth) return false;
+    const far = REALM_ART[d.id + "-far"] || near;
+    const dw = 560;
+    const dh = dw * near.height / near.width;
+    const yMin = Math.min(0, PLAY_H - dh);
+    let y = -dh * 0.2 - northAmt() * 64;
+    if (y < yMin) y = yMin;
+    if (y > 0) y = 0;
+    if (far && far.naturalWidth) drawMirroredStrip(far, dw * 1.06, dh * 1.06, paintScroll * 0.08, y + 10);
+    drawMirroredStrip(near, dw, dh, paintScroll * 0.2, y);
+    ctx.save();
+    const laneY = PLAY_H * (0.46 - northAmt() * 0.08);
+    const shade = ctx.createRadialGradient(W * 0.5, laneY, 30, W * 0.5, laneY, PLAY_H * 0.62);
+    shade.addColorStop(0, "rgba(6,4,12,0.16)");
+    shade.addColorStop(1, "rgba(6,4,12,0)");
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, W, PLAY_H);
+    const seam = ctx.createLinearGradient(0, PLAY_H - 50, 0, PLAY_H);
+    seam.addColorStop(0, "rgba(0,0,0,0)");
+    seam.addColorStop(1, (d.ground && d.ground.base) || "rgba(0,0,0,0.35)");
+    ctx.fillStyle = seam;
+    ctx.fillRect(0, PLAY_H - 50, W, 50);
+    ctx.restore();
+    return true;
+  }
   function drawWorldBackground(wi, alpha) {
     const d = worldDefAt(wi);
     if (alpha < 1) ctx.globalAlpha = alpha;
+    if (drawPaintedSky(d)) { ctx.globalAlpha = 1; return; }
     if (!d.far) {
       drawSky(); drawClouds(); drawHills();
       ctx.globalAlpha = 1;
@@ -4772,11 +4863,16 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function drawWorldGround() {
+    const k = northAmt();
+    if (k > 0.92) return;
     const d = worldDefAt(worldIdx);
-    if (!d.ground) { drawGround(); return; }
+    ctx.save();
+    if (k > 0.2) ctx.globalAlpha *= 1 - (k - 0.2) / 0.72;
+    if (!d.ground) { drawGround(); ctx.restore(); return; }
     const gs = worldGroundSprite(worldIdx);
     const off = ((((groundX - scrollAlpha(1)) % GROUND_TILE) + GROUND_TILE) % GROUND_TILE) - GROUND_TILE;
     ctx.drawImage(gs.c, off, PLAY_H, gs.w, gs.h);
+    ctx.restore();
   }
 
   // Weather in front of the background (cheap: ≤ 24 dots, no allocation)
@@ -4830,20 +4926,32 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.globalAlpha = 1;
   }
 
+  function shortBanner(s) {
+    if (!s) return "";
+    if (s === "Banking north") return "Banking";
+    if (s === "The path bends upward") return "Turning up";
+    if (s === "The path levels out") return "Leveling";
+    if (s === "Landmark ahead") return "Ahead";
+    if (s === "Short section") return "Short";
+    if (s === "Easy stretch") return "Easy";
+    return s;
+  }
   function drawBigBanner() {
     if (bigBannerT <= 0 || state !== State.PLAY) return;
     const t = bigBannerT;
-    // Sits just under the score/level HUD (not over the middle of the play area) and fades quickly.
     const a = Math.min(1, t / 20, (130 - t) / 12 + 0.2);
-    const slide = Math.max(0, (t - 115) / 15) * 20;
-    const y = 212 - slide;
-    ctx.globalAlpha = Math.max(0, a) * 0.6;
-    ctx.fillStyle = bigBannerBoss ? "rgba(60,0,8,0.85)" : "rgba(10,20,40,0.72)";
-    roundRect(40, y - 22, W - 80, bigBannerSub ? 50 : 38, 12);
+    const slide = Math.max(0, (t - 115) / 15) * 12;
+    const title = shortBanner(bigBannerText);
+    const sub = shortBanner(bigBannerSub);
+    const showSub = sub && sub !== title;
+    const y = 300 - slide;
+    ctx.globalAlpha = Math.max(0, a) * 0.4;
+    ctx.fillStyle = bigBannerBoss ? "rgba(60,0,8,0.72)" : "rgba(10,16,28,0.45)";
+    roundRect(W / 2 - 62, y - 9, 124, showSub ? 26 : 16, 8);
     ctx.fill();
-    ctx.globalAlpha = Math.max(0, a);
-    flashText("bigbanner", bigBannerText, bigBannerBoss ? 24 : 19, bigBannerColor, "rgba(0,0,0,0.55)", 4, W / 2, y - 4, Math.max(0, a));
-    if (bigBannerSub) flashText("bigbannersub", bigBannerSub, 11, "#ffffff", "rgba(0,0,0,0.45)", 3, W / 2, y + 17, Math.max(0, a));
+    ctx.globalAlpha = Math.max(0, a) * 0.85;
+    flashText("bigbanner", title, bigBannerBoss ? 14 : 12, bigBannerColor, "rgba(0,0,0,0.35)", 2, W / 2, y - 1, Math.max(0, a));
+    if (showSub) flashText("bigbannersub", sub, 9, "rgba(255,255,255,0.8)", "rgba(0,0,0,0.25)", 2, W / 2, y + 11, Math.max(0, a));
     ctx.globalAlpha = 1;
   }
 
@@ -7393,7 +7501,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     np.gateIndex = gi;
     np.flightDir = leg ? leg.dir : "east";
     if (leg && leg.cue) {
-      const sub = np.beatCue || (leg.turn === "north" ? "The path bends upward" : leg.dir === "north" ? "Landmark ahead" : "The path levels out");
+      const sub = np.beatCue || (leg.turn === "north" ? "Turning up" : leg.dir === "north" ? "Ahead" : "Leveling");
       showBigBanner(leg.cue, sub, "#ffe7b0");
       if (BIRD_FLIP && flipLeft <= 0) flipLeft = FLIP_FRAMES;
     }
@@ -7719,6 +7827,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const scrollMul = state === State.PLAY ? ws : (state === State.START ? 0.35 : 0.15);
     lastScrollMul = scrollMul;
     groundX = (groundX - pipeSpeed * scrollMul) % GROUND_TILE;
+    paintScroll += pipeSpeed * scrollMul;
     cloudX = (cloudX - pipeSpeed * 0.25 * scrollMul) % (W + 220);
     hillX = (hillX - pipeSpeed * 0.5 * scrollMul) % HILL_TILE;
     farX = (farX - pipeSpeed * 0.5 * scrollMul) % FAR_TILE;
@@ -8265,20 +8374,27 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.stroke();
     ctx.restore();
   }
-  function drawGateBit(bit) {
+  function drawGateBit(bit, wi) {
     const r = bit.r;
     const seed = bit.seed || 1;
     const kind = bit.kind;
     const rot = (bit.spin || 0) * frame + ((seed % 7) * 0.2);
+    const painted = obstacleImage(kind, wi);
     ctx.save();
     ctx.fillStyle = "rgba(20,16,24,0.30)";
     ctx.beginPath();
     ctx.ellipse(r * 0.14, r * 0.82, r * 0.74, r * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.rotate(kind === "gear" || kind === "tri" || kind === "crystal" || kind === "kite" || kind === "debris" ? rot : (seed % 5) * 0.04);
+    ctx.rotate(painted ? (seed % 5) * 0.04 : (kind === "gear" || kind === "tri" || kind === "crystal" || kind === "kite" || kind === "debris" ? rot : (seed % 5) * 0.04));
     ctx.lineJoin = "round";
     ctx.lineWidth = 2;
-    if (kind === "rock") {
+    if (painted) {
+      const aspect = painted.height / painted.width;
+      let dw = r * 2.55;
+      let dh = dw * aspect;
+      if (dh > r * 3.2) { dh = r * 3.2; dw = dh / aspect; }
+      ctx.drawImage(painted, -dw / 2, -dh * 0.52, dw, dh);
+    } else if (kind === "rock") {
       ctx.fillStyle = "#8a8074";
       ctx.strokeStyle = "#3a342c";
       ctx.beginPath();
@@ -8570,10 +8686,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.fillStyle = "#1c1030";
       ctx.beginPath(); ctx.arc(-r * 0.18, -r * 0.02, r * 0.06, 0, Math.PI * 2); ctx.arc(r * 0.26, -r * 0.02, r * 0.06, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = "rgba(255,255,255,0.16)";
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.22, -r * 0.28, r * 0.28, r * 0.16, -0.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (!painted) {
+      ctx.fillStyle = "rgba(255,255,255,0.16)";
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.22, -r * 0.28, r * 0.28, r * 0.16, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     const full = Math.max(2, pipeHp());
     const hp = bit.hp | 0;
     if (hp > 0 && !bit.gone) {
@@ -8615,7 +8733,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
       ctx.save();
       ctx.translate(q.x, q.y);
-      drawGateBit(bit);
+      drawGateBit(bit, p.wi);
       ctx.restore();
     }
   }
@@ -12543,6 +12661,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawLandmark() {
     const d = worldDefAt(state === State.START ? 0 : worldIdx);
     const spec = MARK[d.id] || MARK.day;
+    if (paintedReady(d.id)) {
+      if (state === State.PLAY && northAmt() > 0.75 && trophyFlash < 0.08 && bigBannerT < 20) {
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.font = "10px " + FONT;
+        ctx.fillStyle = "#ffe7b0";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText(spec[0], W / 2, 156);
+        ctx.restore();
+      }
+      return;
+    }
     const g = state === State.START ? 0.72 : Math.max(0.7, landmarkGrow());
     const y = 168;
     ctx.save();
@@ -12600,19 +12731,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     let gi = runGate;
     for (let i = 0; i < pipes.length; i++) if (!pipes[i].scored && pipes[i].gateIndex != null) { gi = pipes[i].gateIndex; break; }
     const leg = O.flightLeg(gi);
+    if (bigBannerT > 25 || trophyFlash > 0.2) return;
     let label = "Cruising";
     if (northAmt() > 0.82) label = "Climbing";
-    else if (northAmt() > 0.12) label = leg.ang < -0.4 ? "Banking north" : "Leveling out";
+    else if (northAmt() > 0.12) label = leg.ang < -0.4 ? "Banking" : "Leveling";
     ctx.save();
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = "rgba(12,8,14,0.62)";
-    roundRect(W / 2 - 58, 118, 116, 18, 9);
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = "rgba(12,8,14,0.4)";
+    roundRect(W / 2 - 36, 112, 72, 14, 7);
     ctx.fill();
+    ctx.globalAlpha = 0.7;
     ctx.fillStyle = "#ffe7b0";
-    ctx.font = "bold 11px " + FONT;
+    ctx.font = "10px " + FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, W / 2, 127);
+    ctx.fillText(label, W / 2, 119);
     ctx.restore();
   }
 
@@ -13013,6 +13146,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (flightLock != null) viewAng = flightLock;
         return flightLock;
       },
+      artReady: function () { return paintedReady("day") && paintedReady("snow") && !!(OBST_ART.boulder && OBST_ART.boulder.naturalWidth && OBST_ART.ice && OBST_ART.amber); },
       flightInfo: function () {
         return { y: +bird.y.toFixed(2), vy: +bird.vy.toFixed(3), steer: +(bird.steer || 0).toFixed(3), north: +northAmt().toFixed(3), held: flyHeld, steerDir: steerDir, auto: autoFireLeft, firing: weaponFiring, state: state };
       },

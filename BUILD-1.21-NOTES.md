@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 37) — not uploaded
+
+versionName stays 1.21. versionCode 37. Nothing here is uploaded. Code 36 flight, climb, turn, wings, auto-fire, and the phoenix are unchanged.
+
+## Painted scenery
+Ember Reach and Snowy Peaks use the supplied paintings. Each is mirrored into a seamless strip and scrolled in two layers, the far one slower and blurred. A soft dark oval sits behind the lane. The other realms are color grades of those two paintings. Obstacles are the six cut sprites (boulder, amber crystal, stone ruin, ice crystal, mossy rock, lava rock), matched to the realm. The hit circle is unchanged. A break throws shards of that sprite. The turn banner is a small translucent line lower on the screen, so it does not sit on the trophy toast.
+
 # Sky Hop 1.21 revised test build (versionCode 36) — not uploaded
 
 versionName stays 1.21. versionCode 36. Nothing here is uploaded.

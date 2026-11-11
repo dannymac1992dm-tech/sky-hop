@@ -69,14 +69,14 @@
   ];
 
   var KIND_META = {
-    rock: { crack: "#2c261f", chip: ["#8d8478", "#d5c7b0", "#5e584e"], hi: "#f3ecdf" },
-    crystal: { crack: "#2a1860", chip: ["#7a5cff", "#d7c6ff", "#3ec0ff"], hi: "#f4f0ff" },
+    rock: { crack: "#2c261f", chip: ["#8a8478", "#cfc6b8", "#4e4942"], hi: "#f3ecdf" },
+    crystal: { crack: "#6a3a10", chip: ["#ffb03a", "#ff7a18", "#ffe08a"], hi: "#fff1c4" },
     gear: { crack: "#3a2a10", chip: ["#e0a93c", "#8a5a18", "#fff1c4"], hi: "#fff6d8" },
     tri: { crack: "#3a1408", chip: ["#ff7a1a", "#6a3010", "#ffd27a"], hi: "#ffe7b8" },
     debris: { crack: "#1c1816", chip: ["#6e655c", "#3a342e", "#b7aa9c"], hi: "#e6ddd2" },
     slab: { crack: "#5a3414", chip: ["#e0a05a", "#a86830", "#f3d2a4"], hi: "#fff0d8" },
     cactusball: { crack: "#14381c", chip: ["#3f9a45", "#1e5c28", "#b7e38a"], hi: "#e7ffc8" },
-    ice: { crack: "#1a3c68", chip: ["#d7f1ff", "#7eb6e6", "#f7fbff"], hi: "#ffffff" },
+    ice: { crack: "#1a3c68", chip: ["#d7f4ff", "#7eb6e8", "#ffffff"], hi: "#ffffff" },
     snowball: { crack: "#4a6078", chip: ["#ffffff", "#d5e4f2", "#9bb4cc"], hi: "#ffffff" },
     sign: { crack: "#14082a", chip: ["#6a5cff", "#ff4fd8", "#1a1438"], hi: "#d8fff8" },
     asteroid: { crack: "#1a1030", chip: ["#8b7fb8", "#3d3560", "#d9d0ee"], hi: "#f0eaff" },
@@ -84,7 +84,7 @@
     log: { crack: "#3a2414", chip: ["#8a5a32", "#c48a58", "#4e321c"], hi: "#f0d2b0" },
     coral: { crack: "#5a1830", chip: ["#ff8aa4", "#c43a62", "#ffd0dc"], hi: "#fff0f4" },
     shell: { crack: "#5a4030", chip: ["#f2d2b0", "#c48a6a", "#fff6ea"], hi: "#fffaf4" },
-    lavabomb: { crack: "#2a0c08", chip: ["#3a2a30", "#ff6a1a", "#ffd25a"], hi: "#ffe0b0" },
+    lavabomb: { crack: "#2a0c08", chip: ["#2a2428", "#ff4a12", "#ffb03a"], hi: "#ffe0b0" },
     gumdrop: { crack: "#6a2060", chip: ["#ff7ab8", "#b48cff", "#fff0c8"], hi: "#ffffff" },
     lantern: { crack: "#6a3010", chip: ["#ffb03a", "#e23a3a", "#fff1c4"], hi: "#fff8e0" },
     buoy: { crack: "#0c3050", chip: ["#ff5a4a", "#f4f7fb", "#1a6a9a"], hi: "#ffffff" },
