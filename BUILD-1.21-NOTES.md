@@ -1,3 +1,16 @@
+# Sky Hop 1.21 revised test build (versionCode 36) — not uploaded
+
+versionName stays 1.21. versionCode 36. Nothing here is uploaded.
+
+## Flight
+Side-scroll is hold to rise and release to glide. Rise acceleration is -0.16 per frame, capped at -3.2. Glide acceleration is +0.09 per frame, capped at +2.2. Code 35 used a flap impulse of -7.2 and gravity of 0.38, capped at a fall of 10.
+
+## Climb drift
+Code 35 kept adding that gravity to `bird.vy` during a climb. Physics stay in course space, and a north camera yaws -90°, so course-down is screen-right. The bird slid into the right-hand obstacles unless the player kept tapping. Code 36 does not apply gravity on a climb. Leftover `vy` is halved each frame until it is zero. With no input, steer speed eases to zero by 0.14 per frame and the lane holds. Holding the left or right half of the screen steers at 0.16 per frame, capped at 2.8. The climb sprite banks with that steer. Screen edges clamp the bird and do not kill it. The heading eases at 3.6% of the remaining angle per frame (about one second for a right angle). The side pose crossfades to the climb pose between 28% and 78% of that turn.
+
+## Wings and weapons
+The wings loop the whole time. The beat is faster and deeper while rising, slower and shallower while gliding, and it does not stop. One tap on the weapon button, now a 64px target at the lower right, auto-fires for 600 frames (about 10 seconds) or until the ammo is gone. That tap is not a fly input. Early gaps are wider (base 162, plus 44px on the opening pipes) and the opening speed ramp is gentler.
+
 # Sky Hop 1.21 revised test build (versionCode 35) — not uploaded
 
 versionName stays 1.21. versionCode 35. Nothing here is uploaded.

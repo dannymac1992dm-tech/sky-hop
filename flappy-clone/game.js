@@ -2066,11 +2066,23 @@
     vy: 0,
     rot: 0,
     wing: 0,
+    steer: 0,
+    wingPhase: 0,
+    playH: PLAY_H,
   };
 
+  // Code 35 hop: GRAVITY 0.38 on bird.vy, FLAP impulse -7.2, MAX_FALL 10.
+  // Code 36 soars. See flight.js. These stay so a ride-mode bounce can still use FLAP.
   const GRAVITY = 0.38;
   const FLAP = -7.2;
   const MAX_FALL = 10;
+  let flyHeld = false;
+  let keyFly = false;
+  let steerDir = 0;
+  let keySteer = 0;
+  const flyIds = new Set();
+  let lastFlyX = W / 2;
+  let autoFireLeft = 0;
 
   // —— Levels (1–10000) ——
   // Level = min(MAX_LEVEL, 1 + floor(score / PIPES_PER_LEVEL))
@@ -2078,7 +2090,7 @@
   const PIPES_PER_LEVEL = 5;
   const BASE_SPEED = 2.4;
   const MAX_SPEED = 4.15;       // soft-capped via difficultyT()
-  const BASE_GAP = 148;
+  const BASE_GAP = 162;
   const MIN_GAP = 102;          // never tighter — endurance after mid-game
   const BASE_SPAWN = 95;
   const MIN_SPAWN = 70;
@@ -2531,8 +2543,8 @@
       early = Math.max(early, Math.min(1, safeStartFrames / 20) * 0.85);
     }
     if (early > 0.02) {
-      speed = speed * (1 - 0.18 * early);
-      gap = gap + 28 * early;
+      speed = speed * (1 - 0.24 * early);
+      gap = gap + 44 * early;
       spawn = Math.round(spawn + 12 * early);
       margin = Math.max(28, margin - 8 * early);
     }
@@ -3330,6 +3342,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       const a = Math.random() * Math.PI * 2, sp = 1.2 + Math.random() * 2.4;
       addParticle(q.x, q.y, Math.cos(a) * sp, Math.sin(a) * sp - 0.6, 18 + Math.random() * 10, 28, meta.chip[i % meta.chip.length], 2.2 + Math.random() * 2);
     }
+    for (let i = 0; i < 5 && particles.length < maxParticles() - 2; i++) {
+      const a = -1.1 + Math.random() * 2.2;
+      addParticle(q.x, q.y, Math.cos(a) * 3.4, Math.sin(a) * 3.4 - 0.4, 8 + Math.random() * 8, 14, i % 2 ? "#fff4c8" : "#ffb15a", 1.3);
+    }
     chunkFx(q.x, q.y, 10, fxo, 0);
     smokeFx(q.x, q.y, 6, 16);
     confettiBurst(q.x, q.y, 22);
@@ -3390,10 +3406,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (kind !== "zap") bolts.length = 0;
   }
   function weaponNow() { const o = []; if (pelletFrames > 0 || pellets.length) o.push("pellet"); if (popQueue > 0 || popRockets.length) o.push("pop"); if (poofQueue > 0 || toys.length) o.push("poof"); if (zapQueue > 0 || zaps.length) o.push("zap"); return o; }
-  let heldWeapon = null; // { kind, ammo, max } stored until the player holds Use. Ammo does not fall while it is waiting.
+  let heldWeapon = null; // { kind, ammo, max } stored until the player taps Use. Ammo does not fall while it is waiting.
   let weaponFiring = false, keyFire = false, fireCd = 0;
   const fireIds = new Set();
-  const FIRE_BTN = { x: 36, y: 470, r: 26, hit: 40 };
+  const FIRE_BTN = { x: 344, y: 456, r: 36, hit: 64 };
   const WPN_LABEL = { pellet: "Pellet Burst", pop: "Rocket Pop", zap: "Zap Wand", poof: "Poof Toy" };
   function weaponOccupied() { return !!(heldWeapon && heldWeapon.ammo > 0) || weaponNow().length > 0; }
   function ammoPack(kind) {
@@ -3409,17 +3425,29 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const n = ammoPack(kind);
     heldWeapon = { kind: kind, ammo: n, max: n };
     fireCd = 0;
+    autoFireLeft = 0;
     burstBanner = { text: WPN_LABEL[kind] + " ready", life: 80, color: (POWERUP_INFO[kind] && POWERUP_INFO[kind].color) || "#fff" };
     return true;
   }
-  function refreshFiring() { weaponFiring = fireIds.size > 0 || keyFire; }
+  function refreshFiring() { weaponFiring = fireIds.size > 0 || keyFire || autoFireLeft > 0; }
+  function armAutoFire() {
+    if (!heldWeapon || heldWeapon.ammo <= 0 || state !== State.PLAY) return;
+    autoFireLeft = window.SkyHopFlight ? window.SkyHopFlight.FLIGHT.AUTO_FIRE_FRAMES : 600;
+    weaponFiring = true;
+  }
   function fireHit(pt) {
     if (!pt || !heldWeapon || heldWeapon.ammo <= 0) return false;
     const dx = pt.x - FIRE_BTN.x, dy = pt.y - FIRE_BTN.y;
     return dx * dx + dy * dy <= FIRE_BTN.hit * FIRE_BTN.hit;
   }
   function tickHeldFire() {
-    if (!heldWeapon || heldWeapon.ammo <= 0) { if (heldWeapon && heldWeapon.ammo <= 0) heldWeapon = null; return; }
+    if (!heldWeapon || heldWeapon.ammo <= 0) {
+      if (heldWeapon && heldWeapon.ammo <= 0) heldWeapon = null;
+      autoFireLeft = 0;
+      return;
+    }
+    if (autoFireLeft > 0 && state === State.PLAY && !pauseMode) autoFireLeft--;
+    refreshFiring();
     if (!weaponFiring || state !== State.PLAY || pauseMode) return;
     const k = heldWeapon.kind;
     if (k === "pellet") {
@@ -3439,7 +3467,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       heldWeapon.ammo--;
       fireCd = Math.max(18, POOF_EVERY - pk().poofCut);
     }
-    if (heldWeapon && heldWeapon.ammo <= 0) { heldWeapon = null; weaponFiring = false; keyFire = false; fireIds.clear(); fireCd = 0; }
+    if (heldWeapon && heldWeapon.ammo <= 0) { heldWeapon = null; weaponFiring = false; keyFire = false; autoFireLeft = 0; fireIds.clear(); fireCd = 0; }
   }
   function startPelletBurst() { clearOthers("pellet"); burstBanner = { text: "Pellet Burst!", life: 80, color: "#ff2d8a" }; const add = PELLET_FRAMES + pk().pelletFrames; pelletFrames = Math.min(pelletFrames + add, add * STACK_MAX); pelletTotal = Math.max(pelletFrames, 1); if (pelletCd < 0) pelletCd = 0; sweep(700, 1200, 0.2, "triangle", 0.03); }   // v1.18: a new pickup extends the burst (up to 2x)
   function startRocketPop() { clearOthers("pop"); burstBanner = { text: "Rocket Pop!", life: 80, color: "#7a4cff" }; const add = POP_ROCKETS + pk().popExtra; if (popQueue <= 0) { popLaunched = 0; popCd = 0; } popQueue = Math.min(popQueue + add, add * STACK_MAX); popTotal = Math.max(popQueue, 1); popHold = POP_HOLD; sweep(300, 760, 0.25, "triangle", 0.035); }
@@ -4404,8 +4432,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         ctx.beginPath(); ctx.arc(d.sun.x, d.sun.y, d.sun.r * 1.7, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = d.sun.c;
         ctx.beginPath(); ctx.arc(d.sun.x, d.sun.y, d.sun.r, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "rgba(255,150,90,0.35)";
-        for (let i = 0; i < 3; i++) ctx.fillRect(d.sun.x - d.sun.r, d.sun.y + 8 + i * 10, d.sun.r * 2, 3);
+        ctx.save();
+        ctx.translate(d.sun.x, d.sun.y);
+        for (let i = 0; i < 6; i++) {
+          const a = -0.4 + i * 0.32;
+          ctx.fillStyle = "rgba(255,214,150,0.08)";
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(a) * 240, Math.sin(a) * 240);
+          ctx.lineTo(Math.cos(a + 0.07) * 240, Math.sin(a + 0.07) * 240);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
       }
       if (d.moon) {
         ctx.fillStyle = "rgba(255,250,220,0.18)";
@@ -4713,6 +4752,16 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   /** Sky + far layer for the current world (cross-fades for ~1 s after a world change). */
+  function fillWorldBackdrop() {
+    const d = worldDefAt(worldIdx);
+    const sky = d.sky || ["#140e2e", "#6a2844", "#e08a42"];
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, sky[0]);
+    g.addColorStop(0.62, sky[1] || sky[0]);
+    g.addColorStop(1, (d.ground && d.ground.base) || sky[2] || sky[0]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
   function drawWorldSky() {
     if (worldFade < 1 && worldFromIdx !== worldIdx) {
       drawWorldBackground(worldFromIdx, 1);
@@ -6701,6 +6750,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state === State.START) {
       if (newGameConfirm) return;
       if (resumeRec) resumeRun(); else startPlay();
+      flyHeld = true;
       return;
     }
     if (state === State.OVER) {
@@ -6710,14 +6760,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       return;
     }
     if (state === State.PLAY) {
-      const pgm = pk().gravMul;
-      bird.vy = pgm === 1 ? FLAP : FLAP * Math.sqrt(pgm); // same flap height under the lighter gravity
-      bird.wing = 1;
-      flapPop = 1;
-      sfxFlap();
-      haptic("flap");
-      spawnParticles(bird.x - 6, bird.y + 4, 4, "#ffffff");
-      emitTrail(5);
+      flyHeld = true;
     }
   }
 
@@ -6943,15 +6986,47 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
         const pt = canvasToLocal({ __pt: t });
-        if (state === State.PLAY && fireHit(pt)) { fireIds.add(t.identifier); refreshFiring(); }
-        else handlePointerAt(pt);
+        if (state === State.PLAY && fireHit(pt)) { armAutoFire(); continue; }
+        handlePointerAt(pt);
+        if (state === State.PLAY && !fireHit(pt)) { flyIds.add(t.identifier); lastFlyX = pt.x; }
       }
+      syncFlightHold();
       return;
     }
     const id = e.pointerId != null ? e.pointerId : "mouse";
     const pt = canvasToLocal(e);
-    if (state === State.PLAY && fireHit(pt)) { fireIds.add(id); refreshFiring(); return; }
+    if (state === State.PLAY && fireHit(pt)) { armAutoFire(); return; }
     handlePointerAt(pt);
+    if (state === State.PLAY && !fireHit(pt)) { flyIds.add(id); lastFlyX = pt.x; }
+    syncFlightHold();
+  }
+
+  function debugClimbSteer() {
+    let tp = null;
+    for (let i = 0; i < pipes.length; i++) {
+      const q = pipes[i];
+      if (q.x + q.w > bird.x - bird.r && (!tp || q.x < tp.x)) tp = q;
+    }
+    const ty = tp ? tp.gapY : PLAY_H / 2;
+    const err = ty - bird.y;
+    return Math.abs(err) < 14 ? 0 : (err > 0 ? 1 : -1);
+  }
+  function syncFlightHold() {
+    const k = northAmt();
+    const touching = flyIds.size > 0;
+    if (k > 0.72) {
+      flyHeld = false;
+      if (keySteer) steerDir = keySteer;
+      else if (touching) steerDir = lastFlyX < W * 0.5 ? -1 : 1;
+      else if (debugAuto) steerDir = debugClimbSteer();
+      else steerDir = 0;
+    } else if (k > 0.28) {
+      flyHeld = touching || keyFly;
+      steerDir = keySteer || (touching ? (lastFlyX < W * 0.5 ? -1 : 1) : 0);
+    } else {
+      flyHeld = touching || keyFly;
+      steerDir = keySteer || 0;
+    }
   }
 
   function handlePointerAt(pt) {
@@ -7114,6 +7189,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function onPointerMove(e) {
+    if (state === State.PLAY && northAmt() > 0.28) {
+      let pt = null;
+      if (e.touches && e.touches.length) {
+        for (let i = 0; i < e.touches.length; i++) {
+          if (flyIds.has(e.touches[i].identifier)) pt = canvasToLocal({ __pt: e.touches[i] });
+        }
+      } else if (flyIds.has(e.pointerId != null ? e.pointerId : "mouse")) pt = canvasToLocal(e);
+      if (pt && !fireHit(pt)) { lastFlyX = pt.x; syncFlightHold(); }
+    }
     if (state === State.TROPHIES && trophyDragY != null) {
       e.preventDefault();
       const pt = canvasToLocal(e);
@@ -7133,9 +7217,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function onPointerUp(e) {
     if (e && e.changedTouches) {
-      for (let i = 0; i < e.changedTouches.length; i++) fireIds.delete(e.changedTouches[i].identifier);
-    } else if (e) fireIds.delete(e.pointerId != null ? e.pointerId : "mouse");
-    else fireIds.clear();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        fireIds.delete(e.changedTouches[i].identifier);
+        flyIds.delete(e.changedTouches[i].identifier);
+      }
+    } else if (e) {
+      const id = e.pointerId != null ? e.pointerId : "mouse";
+      fireIds.delete(id);
+      flyIds.delete(id);
+    } else {
+      fireIds.clear();
+      flyIds.clear();
+    }
+    if (!flyIds.size && !keyFly) flyHeld = false;
+    if (!flyIds.size && !keySteer) steerDir = 0;
+    syncFlightHold();
     refreshFiring();
     trophyDragY = null;
     shopDragY = null;
@@ -7190,9 +7286,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       return;
     }
     if (e.code === "KeyP" && !e.repeat && (state === State.PLAY || pauseMode)) { e.preventDefault(); if (pauseMode === 1) resumeGame(); else if (pauseMode === 2) { pauseMode = 1; pauseCount = 0; } else pauseGame("key"); return; }
-    if (e.code === "KeyF" && state === State.PLAY) { e.preventDefault(); keyFire = true; refreshFiring(); return; }
+    if (e.code === "KeyF" && state === State.PLAY && !e.repeat) { e.preventDefault(); armAutoFire(); return; }
+    if (e.code === "ArrowLeft") { keySteer = -1; steerDir = -1; return; }
+    if (e.code === "ArrowRight") { keySteer = 1; steerDir = 1; return; }
     if (e.code === "Space" || e.key === " " || e.code === "ArrowUp") {
       e.preventDefault();
+      if (state === State.PLAY) { keyFly = true; flyHeld = true; syncFlightHold(); return; }
       if (e.repeat) return;
       if (state !== State.TROPHIES && state !== State.SHOP && state !== State.BIRDS && state !== State.MISSIONS) flap();
       return;
@@ -7206,6 +7305,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   });
   window.addEventListener("keyup", (e) => {
     if (e.code === "KeyF") { keyFire = false; refreshFiring(); }
+    if (e.code === "Space" || e.key === " " || e.code === "ArrowUp") {
+      keyFly = false;
+      if (!flyIds.size) flyHeld = false;
+      syncFlightHold();
+    }
+    if (e.code === "ArrowLeft" && keySteer < 0) { keySteer = 0; if (!flyIds.size) steerDir = 0; syncFlightHold(); }
+    if (e.code === "ArrowRight" && keySteer > 0) { keySteer = 0; if (!flyIds.size) steerDir = 0; syncFlightHold(); }
   });
 
   function clampTrophyScroll() {
@@ -7591,7 +7697,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         shopToastText = "";
       }
     }
-    if (bird.wing > 0) bird.wing *= 0.85;
+    if (window.SkyHopFlight) {
+      const rising = state === State.PLAY && (flyHeld || keyFly || bird.vy < -0.45) && northAmt() < 0.72;
+      bird.wingPose = window.SkyHopFlight.wingMotion(bird.wingPhase, rising);
+      bird.wingPhase = bird.wingPose.phase;
+      bird.wing = 0.5 + Math.sin(bird.wingPhase) * 0.5 * bird.wingPose.depth;
+    }
     if (invulnFrames > 0) invulnFrames--;
     if (ignoreInputFrames > 0) ignoreInputFrames--;
     if (coinPop > 0) coinPop *= 0.9;
@@ -7628,7 +7739,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       bird.y = PLAY_H / 2 + Math.sin(frame * 0.06) * 10;
       bird.vy = 0;
       bird.rot = Math.sin(frame * 0.06) * 0.15;
-      bird.wing = 0.5 + Math.sin(frame * 0.2) * 0.5;
       // Idle light scenery
       if (frame % 100 === 0) spawnTree(false);
       ws = 1;
@@ -7639,28 +7749,38 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     // PLAY
     tickFlight();
     tickPuMode();
+    syncFlightHold();
     const perkGrav = pk().gravMul; // Hummingbird Tight Hover (1 = unchanged)
-    let g = GRAVITY * perkGrav;
-    if (puMode === "ship") g *= 0.6; // the ship floats a little
+    const north = northAmt();
     if (dashing) {
-      // Level, fast burst: no gravity, damp vertical motion
-      bird.vy *= 0.6;
-      bird.y += bird.vy;
+      if (north > 0.55) {
+        bird.vy *= 0.5;
+        bird.steer = (bird.steer || 0) * 0.6;
+        bird.y += bird.steer;
+      } else {
+        bird.vy *= 0.6;
+        bird.y += bird.vy;
+      }
       if (frame % (quality >= 2 ? 4 : 2) === 0 && particles.length < maxParticles() - 6) {
         addParticle(bird.x - 14, bird.y + (Math.random() * 10 - 5), -6, 0, 10, 10, "#fff4d0", 2);
       }
+    } else if (puMode !== "rocket" && window.SkyHopFlight) {
+      const held = north > 0.72 ? false : (flyHeld || keyFly);
+      window.SkyHopFlight.stepBird(bird, { north: north, held: held, steer: steerDir, gravMul: puMode === "ship" ? perkGrav * 0.6 : perkGrav });
     } else if (puMode !== "rocket") {
-      bird.vy = Math.min(bird.vy + g, MAX_FALL);
+      bird.vy = Math.min(bird.vy + GRAVITY * perkGrav, MAX_FALL);
       bird.y += bird.vy;
     }
-    bird.rot = dashing ? -0.1 : Math.max(-0.55, Math.min(1.15, bird.vy * 0.08));
+    bird.rot = north > 0.65 ? (bird.steer || 0) * -0.16 : (dashing ? -0.1 : Math.max(-0.35, Math.min(0.55, bird.vy * 0.06)));
     if (debugAuto) {
-      // QA autopilot (?debug=1 only): glide toward the next gap center
+      // QA autopilot (?debug=1 only): ease toward the next gap. A climb steers, it does not teleport.
       let tp = null;
       for (const q of pipes) if (q.x + q.w > bird.x - bird.r && (!tp || q.x < tp.x)) tp = q;
       const ty = tp ? tp.gapY : PLAY_H / 2;
-      bird.y += (ty - bird.y) * 0.3;
-      bird.vy = 0;
+      if (northAmt() <= 0.7) {
+        bird.y += (ty - bird.y) * 0.18;
+        bird.vy *= 0.5;
+      }
     }
 
     // v1.18: the one fixed Phoenix trail (red / orange / gold embers), always on while flying
@@ -7672,7 +7792,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       bird.y = Math.max(bird.r + 1, Math.min(PLAY_H - bird.r - 1, bird.y));
       bird.vy = bird.y > PLAY_H / 2 ? FLAP * 0.7 : 1.5;
     }
-    if (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H) {
+    if (northAmt() <= 0.45 && (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H)) {
       gameOver();
       if (state !== State.PLAY) return;
       // Protected (invulnerable / shield absorbed): bounce back into the play area
@@ -7794,8 +7914,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.beginPath(); ctx.arc(312, 118, 90, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "rgba(255,220,170,0.9)";
       ctx.beginPath(); ctx.arc(312, 118, 28, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(0, PLAY_H * 0.58, W, 14);
     }), 0, 0);
   }
 
@@ -8153,6 +8271,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const kind = bit.kind;
     const rot = (bit.spin || 0) * frame + ((seed % 7) * 0.2);
     ctx.save();
+    ctx.fillStyle = "rgba(20,16,24,0.30)";
+    ctx.beginPath();
+    ctx.ellipse(r * 0.14, r * 0.82, r * 0.74, r * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.rotate(kind === "gear" || kind === "tri" || kind === "crystal" || kind === "kite" || kind === "debris" ? rot : (seed % 5) * 0.04);
     ctx.lineJoin = "round";
     ctx.lineWidth = 2;
@@ -8448,6 +8570,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.fillStyle = "#1c1030";
       ctx.beginPath(); ctx.arc(-r * 0.18, -r * 0.02, r * 0.06, 0, Math.PI * 2); ctx.arc(r * 0.26, -r * 0.02, r * 0.06, 0, Math.PI * 2); ctx.fill();
     }
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.22, -r * 0.28, r * 0.28, r * 0.16, -0.5, 0, Math.PI * 2);
+    ctx.fill();
     const full = Math.max(2, pipeHp());
     const hp = bit.hp | 0;
     if (hp > 0 && !bit.gone) {
@@ -8761,12 +8887,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (u > 0.28) return 2;
     return 1;
   }
-  function drawPhoenixSprite(kind, index, pal) {
+  function drawPhoenixSprite(kind, pose, pal) {
     const spec = PHOENIX_ART[kind];
-    let img = spec.frames[index] || spec.frames[1] || spec.frames[0];
-    if (!img) return false;
+    const posed = pose && typeof pose === "object";
+    const aIdx = posed ? pose.a : (pose | 0);
+    const bIdx = posed ? pose.b : aIdx;
+    const blend = posed ? Math.max(0, Math.min(1, pose.f || 0)) : 0;
+    let imgA = spec.frames[aIdx] || spec.frames[1] || spec.frames[0];
+    let imgB = spec.frames[bIdx] || imgA;
+    if (!imgA) return false;
     const warm = (pal.species || "sparrow") === "sparrow" && (pal.birdId || "bird_default") === "bird_default";
-    if (!warm && pal.body1) img = phoenixTint(img, scHex(pal.body1));
+    if (!warm && pal.body1) {
+      const hex = scHex(pal.body1);
+      imgA = phoenixTint(imgA, hex);
+      imgB = phoenixTint(imgB, hex);
+    }
     const st = scStep(pal && pal.evo);
     const scale = spec.drawW / spec.canvas[0];
     const w = spec.canvas[0] * scale, h = spec.canvas[1] * scale;
@@ -8778,7 +8913,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.beginPath(); ctx.ellipse(0, 2, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    ctx.drawImage(img, -ax, -ay, w, h);
+    const baseA = ctx.globalAlpha;
+    ctx.globalAlpha = baseA * (1 - blend);
+    ctx.drawImage(imgA, -ax, -ay, w, h);
+    if (blend > 0.02 && imgB) {
+      ctx.globalAlpha = baseA * blend;
+      ctx.drawImage(imgB, -ax, -ay, w, h);
+    }
+    ctx.globalAlpha = baseA;
     ctx.save();
     for (let i = 0; i < 4; i++) {
       const t = (frame * 0.12 + i * 0.27) % 1;
@@ -8795,7 +8937,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawBirdFigure(pal, wingAngle) {
     if (PHOENIX_ART.ready) {
       if (!evoFitBusy) evoFitLast = evoFit(pal);
-      drawPhoenixSprite("side", phoenixFrameSide(wingAngle), pal);
+      drawPhoenixSprite("side", bird.wingPose || phoenixFrameSide(wingAngle), pal);
       return;
     }
     ctx.save();
@@ -9400,7 +9542,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
   function drawBirdUp(pal, wingLift) {
     if (PHOENIX_ART.ready) {
-      drawPhoenixSprite("climb", phoenixFrameClimb(wingLift), pal);
+      drawPhoenixSprite("climb", bird.wingPose || phoenixFrameClimb(wingLift), pal);
       if (state === State.PLAY && shieldUp()) {
         ctx.strokeStyle = "rgba(190,230,255,0.9)";
         ctx.lineWidth = 1.6;
@@ -10207,7 +10349,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const pal = activeBirdPalette(showPipes);
     const evo = pal.evo;
     const wingBoost = 1 + (evo.feel || 0) * 0.35;
-    let wingAngle = -0.5 + bird.wing * 1.1 * wingBoost;
+    let wingAngle = -0.2 + Math.sin(bird.wingPhase || 0) * ((bird.wingPose && bird.wingPose.depth) || 0.5) * wingBoost;
     if (pal.species === "hummingbird") wingAngle = -0.4 + Math.sin(frame * 1.4) * 0.8;
 
     // Invulnerability blink (continue / checkpoint / post-shield)
@@ -10970,15 +11112,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const b = FIRE_BTN;
     const info = POWERUP_INFO[heldWeapon.kind] || { color: "#fff" };
     ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.hit * 0.72, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = weaponFiring ? "#fff4cc" : info.color;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.stroke();
-    ctx.fillStyle = "#1a1208"; ctx.font = "bold 12px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("Use", b.x, b.y - 6);
+    ctx.fillStyle = "#1a1208"; ctx.font = "bold 13px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(autoFireLeft > 0 ? "Auto" : "Use", b.x, b.y - 6);
     const frac = heldWeapon.max > 0 ? heldWeapon.ammo / heldWeapon.max : 0;
     ctx.font = "bold 10px " + FONT;
     ctx.fillText(heldWeapon.kind === "pellet" ? Math.ceil(heldWeapon.ammo / 60) + "s" : String(heldWeapon.ammo), b.x, b.y + 8);
     ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke();
+    if (autoFireLeft > 0) {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (autoFireLeft / 600)); ctx.stroke();
+    }
     ctx.restore();
   }
   function drawSkillHud() {
@@ -11241,7 +11389,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText("Tap / Space to start", W / 2, 490);
+    ctx.fillText("Hold to fly", W / 2, 490);
     ctx.globalAlpha = 1;
     }
 
@@ -12300,14 +12448,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
     const leg = O.flightLeg(gi);
     const target = leg.ang;
-    viewAng += (target - viewAng) * 0.045;
+    viewAng += (target - viewAng) * 0.036;
     if (Math.abs(target - viewAng) < 0.004) viewAng = target;
   }
   function upBlend() {
     const k = northAmt();
-    if (k <= 0.12) return 0;
-    if (k >= 0.72) return 1;
-    const t = (k - 0.12) / 0.6;
+    if (k <= 0.28) return 0;
+    if (k >= 0.78) return 1;
+    const t = (k - 0.28) / 0.5;
     return t * t * (3 - 2 * t);
   }
   function flipAngle() {
@@ -12363,6 +12511,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (up > 0.005) {
       ctx.save();
       ctx.globalAlpha *= up;
+      ctx.rotate(-(bird.steer || 0) * 0.22 * up);
       ctx.scale(s, s);
       if (state === State.PLAY && puMagnetFrames > 0) {
         ctx.strokeStyle = "#ff7fb0";
@@ -12442,12 +12591,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
   function drawCourseRail() {
-    const k = northAmt();
-    if (k < 0.12) return;
-    ctx.globalAlpha = k * 0.9;
-    ctx.fillStyle = "#1a1014";
-    ctx.fillRect(-80, -8, W + 400, 18);
-    ctx.globalAlpha = 1;
+    // The old course bar became a black edge once the view turned. The heading chip carries that cue.
   }
   function drawFlightChip() {
     if (state !== State.PLAY) return;
@@ -12503,6 +12647,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const playing = state === State.PLAY;
     const shiftX = playing ? pipeSpeed * ws * renderAlpha : 0;
     if (state === State.START && (worldIdx !== 0 || bossOn)) syncWorld(false);
+    fillWorldBackdrop();
     drawWorldSky();
     drawWorldWeather();
     drawLandmark();
@@ -12806,7 +12951,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       setShopScroll: function (y) { shopScroll = y; clampShopScroll(); },
       clearHazardsForShot: function () { trees.length = 0; animals.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
       buttons: function () { return JSON.parse(JSON.stringify(uiButtons)); },
-      expectedSpeed: function (lv, sc) { const t = difficultyT(lv); let sp = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t; const early = 1 - Math.max(0, Math.min(20, sc)) / 20; if (early > 0.02) sp *= 1 - 0.18 * early; return sp * midEase(lv).speedMul; },
+      expectedSpeed: function (lv, sc) { const t = difficultyT(lv); let sp = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t; const early = 1 - Math.max(0, Math.min(20, sc)) / 20; if (early > 0.02) sp *= 1 - 0.24 * early; return sp * midEase(lv).speedMul; },
       oldSpeed: function (lv) { const t = difficultyT(lv); return BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t; },
       oldGap: function (lv) { const t = difficultyT(lv); return BASE_GAP + (MIN_GAP - BASE_GAP) * t; },
       easeConsts: function () { return { EASE_FROM_LEVEL: EASE_FROM_LEVEL, EASE_RAMP_LEVELS: EASE_RAMP_LEVELS, EASE_GAP_PX: EASE_GAP_PX, EASE_SPEED_MUL: EASE_SPEED_MUL, EASE_SPAWN_FRAMES: EASE_SPAWN_FRAMES, BASE_GAP: BASE_GAP, MIN_GAP: MIN_GAP, BASE_SPEED: BASE_SPEED, MAX_SPEED: MAX_SPEED, BASE_SPAWN: BASE_SPAWN, MIN_SPAWN: MIN_SPAWN }; },
@@ -12860,12 +13005,56 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       },
       flipInfo: function () { return { on: BIRD_FLIP, left: flipLeft, ang: +flipAngle().toFixed(3) }; },
       setFlight: function (mode) {
+        if (typeof mode === "number") { flightLock = mode; viewAng = mode; return flightLock; }
         if (mode === "north") flightLock = -Math.PI / 2;
         else if (mode === "turn") flightLock = -Math.PI / 4;
         else if (mode === "east") flightLock = 0;
         else flightLock = null;
         if (flightLock != null) viewAng = flightLock;
         return flightLock;
+      },
+      flightInfo: function () {
+        return { y: +bird.y.toFixed(2), vy: +bird.vy.toFixed(3), steer: +(bird.steer || 0).toFixed(3), north: +northAmt().toFixed(3), held: flyHeld, steerDir: steerDir, auto: autoFireLeft, firing: weaponFiring, state: state };
+      },
+      climbProbe: function (frames) {
+        pipes.length = 0; hunters.length = 0; projectiles.length = 0; coins.length = 0; powerups.length = 0;
+        state = State.PLAY; pauseMode = 0; puMode = null; invulnFrames = 0; debugAuto = false;
+        flightLock = -Math.PI / 2; viewAng = -Math.PI / 2;
+        flyHeld = false; keyFly = false; keySteer = 0; steerDir = 0; flyIds.clear();
+        bird.y = 260; bird.vy = 4; bird.steer = 1.2; bird.r = 16; bird.playH = PLAY_H;
+        nextSpawn = 100000;
+        const y0 = bird.y;
+        const prev = freeze112; freeze112 = false;
+        for (let i = 0; i < frames; i++) update();
+        freeze112 = prev;
+        return { y0: y0, y: +bird.y.toFixed(2), vy: bird.vy, steer: +(bird.steer || 0).toFixed(3), state: state, dy: +(bird.y - y0).toFixed(2) };
+      },
+      steerProbe: function () {
+        pipes.length = 0; hunters.length = 0; projectiles.length = 0;
+        state = State.PLAY; pauseMode = 0; puMode = null; invulnFrames = 0; debugAuto = false;
+        flightLock = -Math.PI / 2; viewAng = -Math.PI / 2;
+        flyIds.clear(); keyFly = false; flyHeld = false;
+        bird.y = 260; bird.vy = 0; bird.steer = 0; bird.r = 16; bird.playH = PLAY_H;
+        nextSpawn = 100000;
+        const prev = freeze112; freeze112 = false;
+        keySteer = 1;
+        for (let i = 0; i < 40; i++) update();
+        const moved = bird.y;
+        keySteer = 0; steerDir = 0;
+        for (let i = 0; i < 90; i++) update();
+        const settled = bird.y;
+        for (let i = 0; i < 60; i++) update();
+        freeze112 = prev;
+        keySteer = 0;
+        return { moved: +moved.toFixed(2), settled: +settled.toFixed(2), y: +bird.y.toFixed(2), steer: +(bird.steer || 0).toFixed(3), state: state };
+      },
+      armAuto: function () { armAutoFire(); return autoFireLeft; },
+      step: function (n) {
+        const prev = freeze112;
+        freeze112 = false;
+        for (let i = 0; i < (n || 1); i++) update();
+        freeze112 = true;
+        return { state: state, auto: autoFireLeft, pellets: pellets.length, held: heldWeapon ? heldWeapon.ammo : 0, y: +bird.y.toFixed(2) };
       },
       pauseGame: function (r) { return pauseGame(r || "debug"); },
       resumeGame: function () { return resumeGame(); },
