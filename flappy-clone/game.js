@@ -188,7 +188,7 @@
   // Profiling note: 1.5× cost more than the whole 1.4-era frame in a 4–6× CPU-throttled test,
   // so the default stays at 1× (the pre-1.5 resolution) — smoothness first.
   const QUALITY_KEY = "skyhop_quality_v15b";
-  const QUALITY_CAPS = [1.5, 1, 1];
+  const QUALITY_CAPS = [3, 3, 2];
   let quality = 1;
   try {
     const qs = /[?&]quality=(\d)/.exec(String(location.search));
@@ -204,6 +204,7 @@
   } catch (_) {}
   let renderScale = 1;
   let lastCssScale = 1;
+  let phoenixScaled = {};
   function maxParticles() { return quality >= 2 ? 24 : 48; }
   function applyRenderScale(cssScale) {
     if (cssScale) lastCssScale = cssScale;
@@ -217,6 +218,7 @@
     spriteCache.clear();
     spriteGen++;
     shieldGrad = null;
+    phoenixScaled = {};
   }
   const perf = { sum: 0, cnt: 0, best: 1e9, slowWindows: 0, cooldown: 0, fps: 60, drops: 0 };
   /** Rolling fps check: judged every 60 frames or 1s (whichever first) during gameplay. */
@@ -4864,7 +4866,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function drawWorldGround() {
     const k = northAmt();
-    if (k > 0.92) return;
+    if (k > 0.08) return;
+    if (worldDefAt(worldIdx).id === "space" && worldFade < 0.999) return;
     const d = worldDefAt(worldIdx);
     ctx.save();
     if (k > 0.2) ctx.globalAlpha *= 1 - (k - 0.2) / 0.72;
@@ -7845,9 +7848,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
 
     if (state === State.START) {
-      bird.y = PLAY_H / 2 + Math.sin(frame * 0.06) * 10;
+      bird.y = PLAY_H / 2;
       bird.vy = 0;
-      bird.rot = Math.sin(frame * 0.06) * 0.15;
+      bird.rot = 0;
       // Idle light scenery
       if (frame % 100 === 0) spawnTree(false);
       ws = 1;
@@ -7880,7 +7883,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       bird.vy = Math.min(bird.vy + GRAVITY * perkGrav, MAX_FALL);
       bird.y += bird.vy;
     }
-    bird.rot = north > 0.65 ? (bird.steer || 0) * -0.16 : (dashing ? -0.1 : Math.max(-0.35, Math.min(0.55, bird.vy * 0.06)));
+    bird.rot = 0;
     if (debugAuto) {
       // QA autopilot (?debug=1 only): ease toward the next gap. A climb steers, it does not teleport.
       let tp = null;
@@ -7896,18 +7899,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     trailTick++;
     if (trailTick % 3 === 0) emitTrail(2);
 
-    if (puMode && (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H)) {
-      // ride modes never crash on the floor / ceiling
-      bird.y = Math.max(bird.r + 1, Math.min(PLAY_H - bird.r - 1, bird.y));
-      bird.vy = bird.y > PLAY_H / 2 ? FLAP * 0.7 : 1.5;
-    }
-    if (northAmt() <= 0.45 && (bird.y - bird.r < 0 || bird.y + bird.r > PLAY_H)) {
-      gameOver();
-      if (state !== State.PLAY) return;
-      // Protected (invulnerable / shield absorbed): bounce back into the play area
-      if (bird.y + bird.r > PLAY_H) { bird.y = PLAY_H - bird.r - 1; bird.vy = FLAP * 0.85; }
-      if (bird.y - bird.r < 0) { bird.y = bird.r + 1; bird.vy = 1.5; }
-    }
+    keepInPlay();
 
     nextSpawn -= ws; // distance-based spacing (dash / ride modes keep pipe spacing fair)
     if (nextSpawn <= 0) {
@@ -8957,8 +8949,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
   // Painted phoenix sprites (code 35). The body stays near the hit circle; the tail may hang past it.
   const PHOENIX_ART = {
-    side: { canvas: [1192, 738], anchor: [846, 395], drawW: 156, frames: [null, null, null] },
-    climb: { canvas: [843, 1135], anchor: [423, 269], drawW: 58, frames: [null, null, null] },
+    side: {
+      canvas: [1192, 738], anchor: [846, 395], drawW: 156, frames: [null, null, null],
+      pivots: [[831, 413], [824, 394], [827, 411]]
+    },
+    climb: {
+      canvas: [843, 1135], anchor: [423, 269], drawW: 58, frames: [null, null, null],
+      pivots: [[424, 312], [424, 305], [423, 307]]
+    },
     ready: false
   };
   (function loadPhoenixArt() {
@@ -9023,7 +9021,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const st = scStep(pal && pal.evo);
     const scale = spec.drawW / spec.canvas[0];
     const w = spec.canvas[0] * scale, h = spec.canvas[1] * scale;
-    const ax = spec.anchor[0] * scale, ay = spec.anchor[1] * scale;
+    imgA = phoenixSharp(kind, aIdx, imgA);
+    imgB = phoenixSharp(kind, bIdx, imgB);
+    const baseA = ctx.globalAlpha;
+    function blitFrame(img, idx, alpha) {
+      if (!img || alpha < 0.02) return;
+      const piv = (spec.pivots && spec.pivots[idx]) || spec.anchor;
+      ctx.globalAlpha = baseA * alpha;
+      ctx.drawImage(img, -piv[0] * scale, -piv[1] * scale, w, h);
+    }
     if (st > 6) {
       ctx.save();
       ctx.globalAlpha = Math.min(0.22, 0.04 + st * 0.006);
@@ -9031,13 +9037,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.beginPath(); ctx.ellipse(0, 2, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
-    const baseA = ctx.globalAlpha;
-    ctx.globalAlpha = baseA * (1 - blend);
-    ctx.drawImage(imgA, -ax, -ay, w, h);
-    if (blend > 0.02 && imgB) {
-      ctx.globalAlpha = baseA * blend;
-      ctx.drawImage(imgB, -ax, -ay, w, h);
-    }
+    blitFrame(imgA, aIdx, 1 - blend);
+    blitFrame(imgB, bIdx, blend);
     ctx.globalAlpha = baseA;
     ctx.save();
     for (let i = 0; i < 4; i++) {
@@ -9051,6 +9052,26 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
     ctx.restore();
     return true;
+  }
+  function phoenixSharp(kind, index, src) {
+    if (!src || !src.width) return src;
+    const spec = PHOENIX_ART[kind];
+    const rs = renderScale || 1;
+    const tw = Math.max(1, Math.round(spec.drawW * rs));
+    const th = Math.max(1, Math.round(tw * (src.height / src.width)));
+    const key = kind + ":" + index + ":" + tw + ":" + (src.src || src.width);
+    let c = phoenixScaled[key];
+    if (!c) {
+      c = document.createElement("canvas");
+      c.width = tw;
+      c.height = th;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(src, 0, 0, tw, th);
+      phoenixScaled[key] = c;
+    }
+    return c;
   }
   function drawBirdFigure(pal, wingAngle) {
     if (PHOENIX_ART.ready) {
@@ -10460,7 +10481,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     let sc = birdScale * (state === State.PLAY ? puVis : 1);
     if (flapPop > 0.04) sc *= 1 + flapPop * 0.18;
     ctx.scale(sc, sc);
-    ctx.rotate(bird.rot);
+    const bank = window.SkyHopFlight ? window.SkyHopFlight.noseAngle(bird.steer || 0) : 0;
+    ctx.rotate((bird.rot || 0) + bank);
 
     // Evolution feel: slightly snappier wing visual at higher tiers (cosmetic only)
     const showPipes = evoPipes();
@@ -10490,7 +10512,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state === State.PLAY && shieldUp()) {
       const act = skillActive("shield");
       const ending = act > 0 && act < 60 && (frame % 10) < 5;
-      ctx.rotate(-bird.rot);
+      ctx.rotate(-((bird.rot || 0) + (window.SkyHopFlight ? window.SkyHopFlight.noseAngle(bird.steer || 0) : 0)));
       ctx.scale(BIRD_VISUAL_SCALE, BIRD_VISUAL_SCALE);
       if (!shieldGrad) {
         shieldGrad = ctx.createRadialGradient(-6, -8, 4, 0, 0, 26);
@@ -12607,8 +12629,23 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
    * bird.rot is applied inside drawBird after this, so a flap still tips the nose relative to the heading.
    * Uniform scale only, so the crest and wings are not mirrored or squashed. The hit circle stays at the center.
    */
+  function keepInPlay() {
+    const minY = bird.r + 8;
+    const maxY = PLAY_H - bird.r - 8;
+    if (bird.y < minY) {
+      bird.y = minY;
+      if (bird.vy < 0) bird.vy = 0;
+      if ((bird.steer || 0) < 0) bird.steer = 0;
+    } else if (bird.y > maxY) {
+      bird.y = maxY;
+      if (bird.vy > 0) bird.vy = 0;
+      if ((bird.steer || 0) > 0) bird.steer = 0;
+    }
+  }
   function drawBirdHeading() {
-    const p = birdScreenPos();
+    const rawP = birdScreenPos();
+    const rs = renderScale || 1;
+    const p = { x: Math.round(rawP.x * rs) / rs, y: Math.round(rawP.y * rs) / rs };
     const s = courseScale();
     const up = upBlend();
     const spin = flipAngle();
@@ -12629,7 +12666,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (up > 0.005) {
       ctx.save();
       ctx.globalAlpha *= up;
-      ctx.rotate(-(bird.steer || 0) * 0.22 * up);
+      ctx.rotate(window.SkyHopFlight ? window.SkyHopFlight.noseAngle(bird.steer || 0) : 0);
       ctx.scale(s, s);
       if (state === State.PLAY && puMagnetFrames > 0) {
         ctx.strokeStyle = "#ff7fb0";
@@ -12751,6 +12788,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function render() {
     ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     if (warmedAt !== renderScale) {
       drawSky(); drawHills(); drawGround();
       warmSprites();
@@ -13145,6 +13184,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         else flightLock = null;
         if (flightLock != null) viewAng = flightLock;
         return flightLock;
+      },
+      setSteer: function (v) { bird.steer = v; bird.rot = 0; return bird.steer; },
+      lockWing: function () { bird.wingPhase = 0; bird.wingPose = { a: 1, b: 1, f: 0, depth: 0.4, rate: 0.11, phase: 0 }; },
+      spaceTransition: function () {
+        const info = window.SkyHopDebug.shotSetup(81);
+        worldFromIdx = 3;
+        worldIdx = 4;
+        worldFade = 0.4;
+        window.SkyHopDebug.setFlight(-0.65);
+        window.SkyHopDebug.autopilot(false);
+        window.SkyHopDebug.clearHazardsForShot();
+        window.SkyHopDebug.clearMoment();
+        window.SkyHopDebug.freeze112(true);
+        window.SkyHopDebug.redraw();
+        return Object.assign(info, { fade: worldFade, from: worldNameAt(3), to: worldNameAt(4) });
       },
       artReady: function () { return paintedReady("day") && paintedReady("snow") && !!(OBST_ART.boulder && OBST_ART.boulder.naturalWidth && OBST_ART.ice && OBST_ART.amber); },
       flightInfo: function () {

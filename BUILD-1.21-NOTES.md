@@ -1,3 +1,10 @@
+# Sky Hop 1.21 revised test build (versionCode 38) — not uploaded
+
+versionName stays 1.21. versionCode 38. Nothing here is uploaded. Code 37 flight speeds, weapons, obstacles and the phoenix art are unchanged.
+
+## Body
+The phoenix turns as one piece around the chest. The nose and the body yaw the same way as the steering input. Wing frames are pinned to that chest point, so the body does not bob or slide while the wings beat. The tail flames still move. Screen edges stop the bird and do not kill it. The ground strip is hidden while a side-scroll turns upward and while a realm fades into space. The canvas uses the screen pixel density, up to 3x.
+
 # Sky Hop 1.21 revised test build (versionCode 37) — not uploaded
 
 versionName stays 1.21. versionCode 37. Nothing here is uploaded. Code 36 flight, climb, turn, wings, auto-fire, and the phoenix are unchanged.

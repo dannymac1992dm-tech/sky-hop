@@ -92,6 +92,45 @@ function bird(y, vy, steer) {
   check("auto-fire window is about 10 seconds", F.FLIGHT.AUTO_FIRE_FRAMES === 600);
 })();
 
+(function noseLeads() {
+  function sign(v) { return v > 0.02 ? 1 : v < -0.02 ? -1 : 0; }
+  ["climb", "side"].forEach(function (pose) {
+    [-2.2, -0.6, 0.6, 2.2].forEach(function (steer) {
+      const lead = F.noseLead(steer, pose);
+      const poseTurn = F.rigidPose(steer, pose, 0, { x: 90, y: 260 });
+      const noseLat = pose === "climb" ? lead.x : lead.y;
+      const s = sign(steer);
+      check(pose + " body, nose and steer share a sign " + steer,
+        sign(poseTurn.body) === s && sign(noseLat) === s && sign(lead.ang) === s,
+        JSON.stringify(poseTurn));
+    });
+  });
+  const lane = { x: 120, y: 240 };
+  let maxMove = 0;
+  let prev = null;
+  for (let i = 0; i <= 24; i++) {
+    const p = F.rigidPose(1.8, i < 12 ? "side" : "climb", -Math.PI / 2 * (i / 24), lane);
+    if (prev) maxMove = Math.max(maxMove, Math.hypot(p.chest.x - prev.x, p.chest.y - prev.y));
+    prev = p.chest;
+  }
+  check("chest stays within 1px through a turn", maxMove < 1, "move=" + maxMove);
+})();
+
+(function edges() {
+  function stay(north, held, steer) {
+    const b = bird(260, 0, 0);
+    for (let i = 0; i < 700; i++) F.stepBird(b, { north: north, held: held, steer: steer });
+    const minY = 16 + F.FLIGHT.EDGE_PAD;
+    const maxY = 520 - 16 - F.FLIGHT.EDGE_PAD;
+    return b.alive === true && b.edgeDeath === false && b.y >= minY - 0.01 && b.y <= maxY + 0.01;
+  }
+  check("holding up for 10s stays on screen", stay(0, true, 0));
+  check("releasing for 10s stays on screen", stay(0, false, 0));
+  check("climb left edge does not kill", stay(1, false, -1));
+  check("climb right edge does not kill", stay(1, false, 1));
+  check("a turn into the ceiling does not kill", stay(0.5, true, 0));
+})();
+
 (function handoff() {
   const b = bird(260, -3.2, 0);
   for (let i = 0; i < 40; i++) F.stepBird(b, { north: 0.5, held: true, steer: 0 });

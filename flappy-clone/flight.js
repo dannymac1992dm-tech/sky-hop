@@ -80,24 +80,62 @@
       b.steer = stepSteer(b.steer, steerIn);
       b.y += b.vy * (1 - fade) + b.steer * fade;
     }
-    if (north > 0.45) {
-      var r = b.r || 16;
-      var playH = b.playH || 520;
-      var minY = r + FLIGHT.EDGE_PAD;
-      var maxY = playH - r - FLIGHT.EDGE_PAD;
-      if (b.y < minY) {
-        b.y = minY;
-        if (b.steer < 0) b.steer = 0;
-        if (b.vy < 0) b.vy = 0;
-      }
-      if (b.y > maxY) {
-        b.y = maxY;
-        if (b.steer > 0) b.steer = 0;
-        if (b.vy > 0) b.vy = 0;
-      }
-      b.edgeDeath = false;
+    var r = b.r || 16;
+    var playH = b.playH || 520;
+    var minY = r + FLIGHT.EDGE_PAD;
+    var maxY = playH - r - FLIGHT.EDGE_PAD;
+    if (b.y < minY) {
+      b.y = minY;
+      if (b.steer < 0) b.steer = 0;
+      if (b.vy < 0) b.vy = 0;
     }
+    if (b.y > maxY) {
+      b.y = maxY;
+      if (b.steer > 0) b.steer = 0;
+      if (b.vy > 0) b.vy = 0;
+    }
+    b.edgeDeath = false;
+    b.alive = true;
     return b;
+  }
+
+  /** One clockwise bank for the whole bird. Positive steer is screen-right. */
+  function noseAngle(steer) {
+    var a = (steer || 0) * 0.2;
+    if (a > 0.62) a = 0.62;
+    if (a < -0.62) a = -0.62;
+    return a;
+  }
+
+  function rotCW(x, y, ang) {
+    var c = Math.cos(ang), s = Math.sin(ang);
+    return { x: x * c - y * s, y: x * s + y * c };
+  }
+
+  function noseLead(steer, pose) {
+    var ang = noseAngle(steer);
+    var nx = pose === "climb" ? 0 : 1;
+    var ny = pose === "climb" ? -1 : 0;
+    var nose = rotCW(nx, ny, ang);
+    nose.ang = ang;
+    return nose;
+  }
+
+  /** Chest stays on the lane point. Body heading and nose heading are the same angle. */
+  function rigidPose(steer, pose, heading, lane) {
+    var bank = noseAngle(steer);
+    var ang = (heading || 0) + bank;
+    var at = lane || { x: 0, y: 0 };
+    var nx = pose === "climb" ? 0 : 1;
+    var ny = pose === "climb" ? -1 : 0;
+    var nose = rotCW(nx, ny, ang);
+    return {
+      ang: ang,
+      bank: bank,
+      body: ang,
+      chest: { x: at.x, y: at.y },
+      nose: { x: at.x + nose.x, y: at.y + nose.y }
+    };
   }
 
   /** Continuous wingbeat. rate is never 0. depth is shallower while gliding. */
@@ -120,6 +158,9 @@
     stepEast: stepEast,
     stepSteer: stepSteer,
     stepBird: stepBird,
+    noseAngle: noseAngle,
+    noseLead: noseLead,
+    rigidPose: rigidPose,
     wingMotion: wingMotion
   };
 });
