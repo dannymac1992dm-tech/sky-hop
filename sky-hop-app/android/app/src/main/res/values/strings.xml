@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sky Hop</string>
+    <string name="title_activity_main">Sky Hop</string>
+    <string name="package_name">com.skyhop.mobile</string>
+    <string name="custom_url_scheme">com.skyhop.mobile</string>
+    <!--
+      AdMob Android App ID (APPLICATION_ID meta-data).
+      LIVE: ca-app-pub-9357129551510699~6915096354
+      Google sample/test (reference only): ca-app-pub-3940256099942544~3347511713
+    -->
+    <string name="admob_app_id">ca-app-pub-9357129551510699~6915096354</string>
+    <!-- v1.9 Play Games Services project / APP_ID (Play Console > Play Games Services > Configuration). -->
+    <string name="game_services_project_id" translatable="false">344910654610</string>
+</resources>

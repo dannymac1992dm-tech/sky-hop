@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sky Hop sky (#6ec6ff, same as the game canvas background) -->
+    <color name="ic_launcher_background">#6EC6FF</color>
+    <color name="splash_background">#6EC6FF</color>
+</resources>
