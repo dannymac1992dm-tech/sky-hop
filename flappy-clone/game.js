@@ -2621,12 +2621,9 @@
     level = levelFromScore(score);
     applyDifficulty();
     if (level > prev) {
-      if (state === State.PLAY && window.SkyHopFlight && window.SkyHopFlight.beginLevelBanner) {
-        levelBanner = window.SkyHopFlight.beginLevelBanner(prev, score);
-      }
+      levelBanner = null;
+      levelFlash = 0;
       hitchNote("levelup");
-      levelFlash = 1;
-      levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
       checkEvolution();
@@ -8113,7 +8110,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
     if (state === State.TROPHIES || state === State.SHOP || state === State.BIRDS || state === State.MISSIONS) return;
 
-    if (levelBanner && window.SkyHopFlight && window.SkyHopFlight.stepLevelBanner) levelBanner = window.SkyHopFlight.stepLevelBanner(levelBanner);
     if (levelCard && levelCard.daily && state === State.PLAY) {
       levelCard.t++;
       return;
@@ -11901,35 +11897,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
 
-  function drawLevelBanner() {
-    if (!levelBanner || state !== State.PLAY || (levelCard && levelCard.daily)) return;
-    const b = levelBanner;
-    const life = b.life || 108;
-    const slide = 14;
-    const fade = 18;
-    let a = 1;
-    if (b.t < slide) a = b.t / slide;
-    else if (b.t > life - fade) a = Math.max(0, (life - b.t) / fade);
-    const u = Math.min(1, b.t / slide);
-    const e = u * u * (3 - 2 * u);
-    const y = -42 + 158 * e;
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, a));
-    ctx.fillStyle = "rgba(12,18,32,0.82)";
-    roundRect(W / 2 - 132, y, 264, 42, 12);
-    ctx.fill();
-    ctx.fillStyle = "#ffb020";
-    ctx.fillRect(W / 2 - 132, y, 264, 3);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 15px " + FONT;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Level " + formatLevel(b.level) + " complete", W / 2, y + 15);
-    ctx.font = "12px " + FONT;
-    ctx.fillStyle = "#ffe7b0";
-    ctx.fillText("Score " + b.score, W / 2, y + 31);
-    ctx.restore();
-  }
   function drawLevelCard() {
     if (!levelCard || !levelCard.daily || state !== State.PLAY) return;
     uiButtons.share = null;
@@ -13311,7 +13278,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
     drawFlash();
     if (shakeOn) ctx.restore();
-    drawLevelBanner();
     drawPauseUi();
   }
 
@@ -13577,12 +13543,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         return shareMessage();
       },
       showLevelDone: function () {
-        dailyMode = false; levelCard = null; state = State.PLAY;
-        score = 60; level = 13;
-        levelBanner = window.SkyHopFlight.beginLevelBanner(12, 60);
-        levelBanner.t = 16;
+        dailyMode = false; levelCard = null; levelBanner = null; state = State.PLAY;
+        const prev = score; score = 5; onScoreChanged(prev);
         freeze112 = true;
         render();
+        return { level: level, banner: levelBanner, flash: levelFlash };
       },
       armWeapon: function (kind) {
         state = State.PLAY;

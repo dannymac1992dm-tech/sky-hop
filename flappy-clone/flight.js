@@ -132,20 +132,6 @@
     return pose;
   }
 
-  var LEVEL_BANNER_FRAMES = 108;
-
-  /** A level clear is a notice only. It never stops the simulation. */
-  function beginLevelBanner(completedLevel, score) {
-    return { level: completedLevel, score: score, t: 0, life: LEVEL_BANNER_FRAMES, blocks: false };
-  }
-  function stepLevelBanner(b) {
-    if (!b) return null;
-    b.t += 1;
-    b.blocks = false;
-    if (b.t >= (b.life || LEVEL_BANNER_FRAMES)) return null;
-    return b;
-  }
-
   return {
     FLIGHT: FLIGHT,
     stepEast: stepEast,
@@ -154,9 +140,6 @@
     noseAngle: noseAngle,
     noseLead: noseLead,
     rigidPose: rigidPose,
-    wingMotion: wingMotion,
-    LEVEL_BANNER_FRAMES: LEVEL_BANNER_FRAMES,
-    beginLevelBanner: beginLevelBanner,
-    stepLevelBanner: stepLevelBanner
+    wingMotion: wingMotion
   };
 });
