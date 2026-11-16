@@ -206,6 +206,29 @@ function bird(y, vy, steer) {
   check("a speed boost keeps the heading forward", Math.abs(r.heading - (-Math.PI / 2)) < 0.0001 && b.steer === steer0, "h=" + r.heading);
 })();
 
+(function fireBeamBendsForward() {
+  const src = { x: 100, y: 240 };
+  const tgt = { x: 280, y: 310 };
+  const pts = F.beamPolyline(src, tgt, 4, 0);
+  check("the beam leaves straight forward", pts[1].y === src.y && pts[1].x > src.x + 20, JSON.stringify(pts[1]));
+  let back = false;
+  for (let i = 1; i < pts.length; i++) if (pts[i].x + 0.01 < pts[i - 1].x) back = true;
+  check("the beam never steps backward", !back);
+  check("the beam ends on the target", pts[pts.length - 1].x === tgt.x && pts[pts.length - 1].y === tgt.y);
+  const bent = pts.some(function (p, i) { return i > 1 && i < pts.length - 1 && Math.abs(p.y - src.y) > 8; });
+  check("the beam bends after the straight start", bent);
+  const tip = F.pointAlong(pts, 1);
+  check("the tip points along the last segment", tip.dx !== 0 || tip.dy !== 0);
+  const behind = F.beamPolyline(src, { x: 40, y: 400 }, 4, 1);
+  let side = false;
+  let rev = false;
+  for (let i = 0; i < behind.length; i++) {
+    if (behind[i].y !== src.y) side = true;
+    if (i && behind[i].x < behind[i - 1].x) rev = true;
+  }
+  check("a target behind still fires only forward", !side && !rev && behind[behind.length - 1].x > src.x);
+})();
+
 if (fails) {
   console.error(fails + " flight checks failed");
   process.exit(1);

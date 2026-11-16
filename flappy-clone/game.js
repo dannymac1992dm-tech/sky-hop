@@ -3438,6 +3438,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   const fireballs = [], fireArrows = [], meteors = [];
   let emberAura = 0;
   let laserLeft = 0;
+  let laserGlow = 0;
+  const fireBeams = [];
   let beakPlume = 0;
   const friends = [];
   const friendBolts = [];
@@ -3803,10 +3805,38 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     markBeak(8);
     sfxShieldUp();
   }
+  function barriersAhead(minX) {
+    const out = [];
+    const O = window.SkyHopObstacles;
+    if (!O) return out;
+    for (let i = 0; i < pipes.length; i++) {
+      const p = pipes[i];
+      if (!p.bits) continue;
+      for (let s = 0; s < p.bits.length; s++) {
+        const bit = p.bits[s];
+        if (!bit || bit.gone) continue;
+        const q = O.bitXY(p.x, p.gapY, bit, frame);
+        if (q.x < minX + 10) continue;
+        out.push({ p: p, side: s, x: q.x, y: q.y, d: (q.x - minX) + Math.abs(q.y - bird.y) * 0.4 });
+      }
+    }
+    out.sort(function (a, b) { return a.d - b.d; });
+    return out;
+  }
   function fireLaser() {
-    laserLeft = 160;
+    laserLeft = 150;
+    laserGlow = 0.35;
+    fireBeams.length = 0;
+    fireBeams.push({ id: 0, u: 0.08, phase: 0, key: "" });
+    fireBeams.push({ id: 1, u: 0.08, phase: 1, key: "" });
     markBeak(12);
     beep(180, 0.08, "sawtooth", 0.03);
+  }
+  function worldToScreen(wx, wy) {
+    return {
+      x: W * 0.5 + (wy - CAM_LANE),
+      y: PLAY_H * 0.82 - (wx - bird.x)
+    };
   }
   function grantFriends() {
     const n = 1 + (Math.random() < 0.55 ? 1 : 0);
@@ -3854,20 +3884,38 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
   function updateFireWeapons() {
-    if (state !== State.PLAY) { fireballs.length = 0; fireArrows.length = 0; meteors.length = 0; emberAura = 0; laserLeft = 0; return; }
+    if (state !== State.PLAY) { fireballs.length = 0; fireArrows.length = 0; meteors.length = 0; emberAura = 0; laserLeft = 0; fireBeams.length = 0; return; }
     if (beakPlume > 0) beakPlume--;
+    if (laserGlow > 0) laserGlow *= 0.86;
     if (laserLeft > 0) {
       laserLeft--;
-      markBeak(6);
+      markBeak(8);
+      if (fireBeams.length < 2) {
+        fireBeams.push({ id: 0, u: 0.08, phase: 0, key: "" });
+        fireBeams.push({ id: 1, u: 0.12, phase: 1, key: "" });
+      }
       const src = beakPoint();
-      for (let i = 0; i < 3; i++) flameFx(src.x + 20 + i * 28, src.y + (Math.random() - 0.5) * 6, 1.2, 0, 8, 5);
-      if ((frame % 2) === 0) {
-        for (let d = 16; d <= 210; d += 28) {
-          const sg = pipeSegAt(src.x + d, src.y, 16);
-          if (sg) crackPipe(sg.p, sg.side, 1, src.x + d, src.y, false, "laser");
+      const ahead = barriersAhead(src.x);
+      for (let i = 0; i < fireBeams.length; i++) {
+        const beam = fireBeams[i];
+        const live = ahead.length ? ahead[Math.min(i, ahead.length - 1)] : null;
+        const aim = live ? { x: live.x, y: live.y } : { x: src.x + 170, y: src.y };
+        const key = live ? ((live.p.gateIndex | 0) + ":" + live.side) : "fwd";
+        if (beam.key && beam.key !== key) beam.u = Math.min(beam.u, 0.32);
+        beam.key = key;
+        beam.u = Math.min(1, beam.u + 0.075);
+        beam.pts = window.SkyHopFlight.beamPolyline({ x: src.x, y: src.y }, aim, 4, beam.phase);
+        beam.tip = window.SkyHopFlight.pointAlong(beam.pts, beam.u);
+        beam.locked = !!(live && beam.u > 0.9);
+        if (beam.locked && (frame % 4) === i) {
+          crackPipe(live.p, live.side, 1, live.x, live.y, false, "laser");
+          laserGlow = Math.min(1, laserGlow + 0.45);
+          flameFx(beam.tip.x, beam.tip.y, 0.5, (Math.random() - 0.5) * 0.6, 9, 4);
+          flameFx(beam.tip.x, beam.tip.y, 0.2, (Math.random() - 0.5) * 0.8, 7, 3);
         }
       }
-    }
+      if (laserLeft <= 0) fireBeams.length = 0;
+    } else if (fireBeams.length) fireBeams.length = 0;
     if (emberAura > 0) {
       emberAura--;
       if ((emberAura % 6) === 0) crackPipesNear(bird.x, bird.y, 34, 1);
@@ -4621,11 +4669,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       core.addColorStop(0, "#fff6d0"); core.addColorStop(1, "rgba(255,80,20,0)");
       ctx.fillStyle = core; ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
     } else if (kind === "laser") {
-      const g = ctx.createLinearGradient(0, 16, 0, -18);
-      g.addColorStop(0, "rgba(255,60,10,0)"); g.addColorStop(0.35, "#ff8a1a"); g.addColorStop(0.7, "#fff1c0"); g.addColorStop(1, "#ffffff");
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.moveTo(-3, 16); ctx.lineTo(-8, -2); ctx.lineTo(0, -18); ctx.lineTo(8, -2); ctx.lineTo(3, 16); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(255,255,240,0.9)"; ctx.fillRect(-1.6, -14, 3.2, 26);
+      ctx.lineJoin = "miter";
+      ctx.strokeStyle = "#ff6a1a"; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 2); ctx.lineTo(-8, -4); ctx.lineTo(7, -10); ctx.lineTo(0, -14); ctx.stroke();
+      ctx.strokeStyle = "#fff6d0"; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillStyle = "#ff7a1a";
+      ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(-6, -12); ctx.lineTo(6, -12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#fff8e4";
+      ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(-2.2, -16); ctx.lineTo(2.2, -16); ctx.closePath(); ctx.fill();
     } else if (kind === "friends") {
       ctx.fillStyle = "#8a1a14";
       ctx.beginPath(); ctx.ellipse(0, 4, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
@@ -13180,28 +13231,111 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.scale(s, s);
     drawBirdUp(pal, bird.wing);
     if (state === State.PLAY && (beakPlume > 0 || laserLeft > 0 || (heldWeapon && heldWeapon.kind === "torch" && weaponFiring))) drawBeakPlume();
-    if (state === State.PLAY && laserLeft > 0) drawLaserBeam();
     ctx.restore();
+    if (state === State.PLAY && fireBeams.length) drawFireBeams();
     drawFriendsScreen();
   }
-  function drawLaserBeam() {
-    ctx.save();
-    ctx.translate(0, -18);
-    const g = ctx.createLinearGradient(0, 8, 0, -230);
-    g.addColorStop(0, "rgba(255,255,236,0.98)");
-    g.addColorStop(0.25, "rgba(255,186,48,0.9)");
-    g.addColorStop(1, "rgba(255,50,8,0)");
-    ctx.fillStyle = g;
+  function drawFireBeams() {
+    if (laserGlow > 0.04) {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,120,30," + (laserGlow * 0.16).toFixed(3) + ")";
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+    for (let i = 0; i < fireBeams.length; i++) {
+      const beam = fireBeams[i];
+      if (!beam.pts || beam.pts.length < 2 || !beam.tip) continue;
+      const scr = [];
+      for (let k = 0; k < beam.pts.length; k++) scr.push(worldToScreen(beam.pts[k].x, beam.pts[k].y));
+      const tipW = worldToScreen(beam.tip.x, beam.tip.y);
+      const tipDir = worldToScreen(beam.tip.x + beam.tip.dx, beam.tip.y + beam.tip.dy);
+      const cut = [];
+      cut.push(scr[0]);
+      let reached = false;
+      for (let k = 1; k < scr.length; k++) {
+        const b = scr[k];
+        const wx0 = beam.pts[k - 1], wx1 = beam.pts[k];
+        if (!segmentHolds(wx0, wx1, beam.tip)) { cut.push(b); continue; }
+        cut.push(tipW);
+        reached = true;
+        break;
+      }
+      if (!reached) cut.push(tipW);
+      ctx.save();
+      ctx.lineJoin = "miter";
+      ctx.lineCap = "butt";
+      ctx.strokeStyle = "rgba(255,90,20,0.55)";
+      ctx.lineWidth = 10;
+      strokeChain(cut);
+      ctx.strokeStyle = "#ffb15a";
+      ctx.lineWidth = 4.5;
+      strokeChain(cut);
+      ctx.strokeStyle = "rgba(255,248,220,0.95)";
+      ctx.lineWidth = 1.7;
+      strokeChain(cut);
+      ctx.strokeStyle = "rgba(255,210,120,0.8)";
+      ctx.lineWidth = 1.2;
+      for (let k = 1; k < cut.length - 1; k++) {
+        if (((frame + k + i) % 2) === 0) continue;
+        const p = cut[k];
+        const flick = ((k + i) % 2 === 0 ? 1 : -1) * 10;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + flick, p.y - 8);
+        ctx.stroke();
+      }
+      drawSpearTip(tipW.x, tipW.y, tipDir.x - tipW.x, tipDir.y - tipW.y);
+      if (beam.locked) {
+        const g = ctx.createRadialGradient(tipW.x, tipW.y, 1, tipW.x, tipW.y, 22);
+        g.addColorStop(0, "rgba(255,248,220,0.9)");
+        g.addColorStop(0.4, "rgba(255,140,30,0.45)");
+        g.addColorStop(1, "rgba(255,60,10,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(tipW.x, tipW.y, 22, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  function strokeChain(pts) {
+    if (pts.length < 2) return;
     ctx.beginPath();
-    ctx.moveTo(-14, 6);
-    ctx.lineTo(-5, -220);
-    ctx.lineTo(5, -220);
-    ctx.lineTo(14, 6);
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+  }
+  function segmentHolds(a, b, tip) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = ((tip.x - a.x) * dx + (tip.y - a.y) * dy) / len2;
+    return t >= 0 && t <= 1.02;
+  }
+  function drawSpearTip(x, y, dx, dy) {
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux;
+    const L = 28, half = 8;
+    const bx = x - ux * L, by = y - uy * L;
+    ctx.fillStyle = "#e24112";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(bx + px * half, by + py * half);
+    ctx.lineTo(bx - px * half, by - py * half);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = "rgba(255,255,240,0.95)";
-    ctx.fillRect(-3.2, -170, 6.4, 176);
-    ctx.restore();
+    ctx.fillStyle = "#ffb15a";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(bx + px * half * 0.5, by + py * half * 0.5);
+    ctx.lineTo(bx - px * half * 0.5, by - py * half * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#fff8e4";
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - ux * 11 + px * 2.1, y - uy * 11 + py * 2.1);
+    ctx.lineTo(x - ux * 11 - px * 2.1, y - uy * 11 - py * 2.1);
+    ctx.closePath();
+    ctx.fill();
   }
   function drawBeakPlume() {
     const hot = laserLeft > 0 ? 1.35 : 1;
@@ -13710,7 +13844,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       },
       armWeapon: function (kind) {
         state = State.PLAY;
-        heldWeapon = null; laserLeft = 0; beakPlume = 0; puMode = null; fireballs.length = 0; fireArrows.length = 0; meteors.length = 0; emberAura = 0;
+        heldWeapon = null; laserLeft = 0; fireBeams.length = 0; beakPlume = 0; puMode = null; fireballs.length = 0; fireArrows.length = 0; meteors.length = 0; emberAura = 0;
         pellets.length = 0; popRockets.length = 0; toys.length = 0; zaps.length = 0;
         storeWeapon(kind || "pellet");
         autoFireLeft = 40;
@@ -13773,7 +13907,46 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         finally { ctx = prev; }
         return c.toDataURL("image/png");
       },
-      fireBtnInfo: function () { return { x: FIRE_BTN.x, y: FIRE_BTN.y, r: FIRE_BTN.r, hit: FIRE_BTN.hit }; },
+      tipCloseup: function () {
+        const c = document.createElement("canvas"); c.width = 520; c.height = 360;
+        const g = c.getContext("2d");
+        g.fillStyle = "#1a100c"; g.fillRect(0, 0, 520, 360);
+        const prev = ctx; ctx = g;
+        try {
+          g.save();
+          g.translate(80, 300);
+          g.scale(3.1, 3.1);
+          g.strokeStyle = "rgba(255,90,20,0.55)"; g.lineWidth = 10; g.lineJoin = "miter"; g.lineCap = "butt";
+          g.beginPath(); g.moveTo(0, 0); g.lineTo(18, -28); g.lineTo(8, -52); g.lineTo(36, -78); g.stroke();
+          g.strokeStyle = "#ffb15a"; g.lineWidth = 4.5; g.stroke();
+          g.strokeStyle = "rgba(255,248,220,0.95)"; g.lineWidth = 1.7; g.stroke();
+          drawSpearTip(36, -78, 10, -18);
+          g.restore();
+        } finally { ctx = prev; }
+        return c.toDataURL("image/png");
+      },
+      showLaser: function (steps) {
+        state = State.PLAY; pauseMode = 0; puMode = null; followOn = false; debugAuto = false;
+        pipes.length = 0;
+        spawnPipe();
+        if (pipes.length > 1) pipes.length = 1;
+        if (pipes[0]) {
+          pipes[0].x = bird.x + 120;
+          if (pipes[0].bits) {
+            for (let s = 0; s < pipes[0].bits.length; s++) if (pipes[0].bits[s]) pipes[0].bits[s].gone = false;
+          }
+        }
+        spawnPipe();
+        if (pipes[1]) pipes[1].x = bird.x + 210;
+        fireLaser();
+        freeze112 = false;
+        const n = steps == null ? 10 : steps;
+        for (let i = 0; i < n; i++) updateFireWeapons();
+        freeze112 = true;
+        render();
+        const beam = fireBeams[0];
+        return { n: fireBeams.length, u: beam ? +beam.u.toFixed(2) : 0, locked: !!(beam && beam.locked), pts: beam && beam.pts ? beam.pts.length : 0 };
+      },
       shotSizes: function () {
         const c = document.createElement("canvas"); c.width = 860; c.height = 380;
         const g = c.getContext("2d");
@@ -13794,16 +13967,28 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         return c.toDataURL("image/png");
       },
       weaponSheet: function () {
-        const c = document.createElement("canvas"); c.width = 900; c.height = 460;
+        const kinds = ["pellet", "pop", "zap", "poof", "torch", "fireball", "arrow", "nova", "meteor", "ember", "laser", "friends"];
+        const cols = 4, cellW = 220, cellH = 176;
+        const rows = Math.ceil(kinds.length / cols);
+        const c = document.createElement("canvas"); c.width = cols * cellW; c.height = rows * cellH;
         const x = c.getContext("2d"); const prev = ctx; ctx = x;
         try {
-          x.fillStyle = "#140e12"; x.fillRect(0, 0, 900, 460);
-          ["pellet", "pop", "zap", "poof", "torch", "fireball", "arrow", "nova", "meteor", "ember", "laser", "friends"].forEach(function (k, i) {
-            const col = i % 4, row = Math.floor(i / 4);
+          x.fillStyle = "#140e12"; x.fillRect(0, 0, c.width, c.height);
+          kinds.forEach(function (k, i) {
+            const col = i % cols, row = Math.floor(i / cols);
+            const cx = col * cellW + cellW / 2;
+            const iconY = row * cellH + 58;
             const sp = powerupSprite(k);
-            x.save(); x.translate(110 + col * 210, 70 + row * 120); x.scale(1.3, 1.3); x.drawImage(sp.c, -sp.w / 2, -sp.h / 2); x.restore();
-            x.fillStyle = "#ffe7b0"; x.font = "bold 14px sans-serif"; x.textAlign = "center";
-            x.fillText(WPN_LABEL[k] || POWERUP_INFO[k].name, 110 + col * 210, 130 + row * 120);
+            x.save();
+            x.translate(cx, iconY);
+            x.scale(0.95, 0.95);
+            x.drawImage(sp.c, -sp.w / 2, -sp.h / 2);
+            x.restore();
+            x.fillStyle = "#ffe7b0";
+            x.font = "bold 15px sans-serif";
+            x.textAlign = "center";
+            x.textBaseline = "top";
+            x.fillText(WPN_LABEL[k] || (POWERUP_INFO[k] && POWERUP_INFO[k].name) || k, cx, row * cellH + 128);
           });
         } finally { ctx = prev; }
         return c.toDataURL("image/png");

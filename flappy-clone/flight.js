@@ -134,7 +134,65 @@
     return b;
   }
 
-  /** A speed boost adds forward pace only. Lane, steer, and heading stay as they are. */
+  /** A homing fire beam. +x is forward. The first step leaves the source straight ahead. Later corners may bend. Nothing steps backward. */
+  function beamPolyline(src, tgt, bends, phase) {
+    var pts = [{ x: src.x, y: src.y }];
+    var lead = 46;
+    pts.push({ x: src.x + lead, y: src.y });
+    if (!tgt || tgt.x <= src.x + 8) {
+      pts.push({ x: src.x + lead + 110, y: src.y });
+      return pts;
+    }
+    var n = bends || 4;
+    var sign = phase ? -1 : 1;
+    var x0 = src.x + lead;
+    var y0 = src.y;
+    for (var i = 1; i <= n; i++) {
+      var t = i / n;
+      var x = x0 + (tgt.x - x0) * t;
+      var y = y0 + (tgt.y - y0) * t;
+      if (i < n) y += sign * (i % 2 === 0 ? 1 : -1) * (24 * (1 - t * 0.5));
+      else { x = tgt.x; y = tgt.y; }
+      if (x < pts[pts.length - 1].x) x = pts[pts.length - 1].x + 6;
+      pts.push({ x: x, y: y });
+    }
+    return pts;
+  }
+
+  function pointAlong(pts, u) {
+    if (!pts || !pts.length) return { x: 0, y: 0, dx: 1, dy: 0 };
+    if (pts.length === 1 || u <= 0) {
+      var dx0 = pts.length > 1 ? pts[1].x - pts[0].x : 1;
+      var dy0 = pts.length > 1 ? pts[1].y - pts[0].y : 0;
+      return { x: pts[0].x, y: pts[0].y, dx: dx0, dy: dy0 };
+    }
+    var total = 0;
+    var segs = [];
+    for (var i = 1; i < pts.length; i++) {
+      var dx = pts[i].x - pts[i - 1].x;
+      var dy = pts[i].y - pts[i - 1].y;
+      var len = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+      segs.push({ dx: dx, dy: dy, len: len });
+      total += len;
+    }
+    var want = Math.max(0, Math.min(1, u)) * total;
+    var walked = 0;
+    for (var s = 0; s < segs.length; s++) {
+      if (walked + segs[s].len >= want || s === segs.length - 1) {
+        var t = Math.max(0, Math.min(1, (want - walked) / segs[s].len));
+        return {
+          x: pts[s].x + segs[s].dx * t,
+          y: pts[s].y + segs[s].dy * t,
+          dx: segs[s].dx,
+          dy: segs[s].dy
+        };
+      }
+      walked += segs[s].len;
+    }
+    var last = pts[pts.length - 1];
+    var prev = pts[pts.length - 2];
+    return { x: last.x, y: last.y, dx: last.x - prev.x, dy: last.y - prev.y };
+  }
   function stepBoost(b) {
     var y0 = b.y;
     b.boostVx = 0;
@@ -207,6 +265,8 @@
     rigidPose: rigidPose,
     wingMotion: wingMotion,
     stepFollow: stepFollow,
-    stepBoost: stepBoost
+    stepBoost: stepBoost,
+    beamPolyline: beamPolyline,
+    pointAlong: pointAlong
   };
 });
