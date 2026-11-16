@@ -1,7 +1,8 @@
 /**
- * Sky Hop 1.21 code 39 flight.
+ * Sky Hop 1.21 code 42 flight.
  * The bird always climbs north. bird.y is the left/right lane.
  * A positive lane speed is screen-right. Edges stop the bird; they do not kill.
+ * A finger drag eases the bird toward the touch. Screen-down is backward and is ignored.
  */
 (function (root, factory) {
   var api = factory();
@@ -17,8 +18,18 @@
     STEER_MAX: 2.8,
     STEER_DAMP: 0.14,
     EDGE_PAD: 8,
-    AUTO_FIRE_FRAMES: 600
+    AUTO_FIRE_FRAMES: 600,
+    FOLLOW_EASE: 0.18,
+    FOLLOW_MAX: 4.8,
+    FINGER_LIFT: 46,
+    FORWARD_HEADING: -Math.PI / 2
   };
+
+  function clamp(v, lo, hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+  }
 
   function stepEast(vy, held, gravMul) {
     var m = gravMul == null ? 1 : gravMul;
@@ -76,6 +87,60 @@
     b.edgeDeath = false;
     b.alive = true;
     return b;
+  }
+
+  /**
+   * Drag-to-follow. aimX is the lane under the finger. fingerY is screen y (down is positive).
+   * The bird eases toward the finger, stays above it, and never increases screenY (never flies backward).
+   */
+  function stepFollow(b, input) {
+    input = input || {};
+    if (b.screenY == null) b.screenY = input.homeY != null ? input.homeY : 430;
+    var ease = FLIGHT.FOLLOW_EASE;
+    var max = FLIGHT.FOLLOW_MAX;
+    var aimX = b.y;
+    var aimY = b.screenY;
+    if (input.down) {
+      if (input.aimX != null) aimX = input.aimX;
+      var fingerY = input.fingerY != null ? input.fingerY : b.screenY;
+      var lifted = fingerY - FLIGHT.FINGER_LIFT;
+      if (lifted < b.screenY) aimY = lifted;
+    }
+    if (input.bandTop != null && aimY < input.bandTop) aimY = input.bandTop;
+    if (input.bandBot != null && aimY > input.bandBot) aimY = input.bandBot;
+    if (aimY > b.screenY) aimY = b.screenY;
+    var dx = aimX - b.y;
+    var dy = aimY - b.screenY;
+    var sx = clamp(dx * ease, -max, max);
+    var sy = dy * ease;
+    if (sy < -max) sy = -max;
+    if (sy > 0) sy = 0;
+    var y0 = b.y;
+    var s0 = b.screenY;
+    b.y += sx;
+    b.screenY += sy;
+    b.steer = sx;
+    var r = b.r || 16;
+    var playH = b.playH || 520;
+    var minY = input.laneMin != null ? input.laneMin : r + FLIGHT.EDGE_PAD;
+    var maxY = input.laneMax != null ? input.laneMax : playH - r - FLIGHT.EDGE_PAD;
+    if (b.y < minY) { b.y = minY; if (b.steer < 0) b.steer = 0; }
+    if (b.y > maxY) { b.y = maxY; if (b.steer > 0) b.steer = 0; }
+    b.edgeDeath = false;
+    b.alive = true;
+    b.vy = 0;
+    b.stepX = b.y - y0;
+    b.backDy = b.screenY - s0;
+    return b;
+  }
+
+  /** A speed boost adds forward pace only. Lane, steer, and heading stay as they are. */
+  function stepBoost(b) {
+    var y0 = b.y;
+    b.boostVx = 0;
+    b.heading = FLIGHT.FORWARD_HEADING;
+    b.boostSide = 0;
+    return { dy: b.y - y0, steer: b.steer || 0, heading: b.heading, boostVx: 0, y: b.y };
   }
 
   /** One clockwise bank for the whole bird. Positive steer is screen-right. */
@@ -140,6 +205,8 @@
     noseAngle: noseAngle,
     noseLead: noseLead,
     rigidPose: rigidPose,
-    wingMotion: wingMotion
+    wingMotion: wingMotion,
+    stepFollow: stepFollow,
+    stepBoost: stepBoost
   };
 });

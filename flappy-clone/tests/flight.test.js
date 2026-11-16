@@ -163,6 +163,49 @@ function bird(y, vy, steer) {
   check("a level boundary shows no overlay", overlay == null && level >= 2);
 })();
 
+(function dragFollowsFinger() {
+  const b = bird(200, 0, 0);
+  b.screenY = 430;
+  let maxStep = 0;
+  let prev = b.y;
+  for (let i = 0; i < 36; i++) {
+    F.stepFollow(b, { down: true, aimX: 340, fingerY: 280, bandTop: 220, bandBot: 470, homeY: 430 });
+    maxStep = Math.max(maxStep, Math.abs(b.y - prev));
+    prev = b.y;
+  }
+  check("drag follow eases toward the finger", b.y > 260 && b.y < 340, "y=" + b.y.toFixed(1));
+  check("drag follow does not teleport", maxStep <= F.FLIGHT.FOLLOW_MAX + 0.001, "step=" + maxStep.toFixed(2));
+  check("the bird stays above the finger", b.screenY < 280, "sy=" + b.screenY.toFixed(1));
+  const held = b.y;
+  const heldY = b.screenY;
+  for (let i = 0; i < 20; i++) F.stepFollow(b, { down: false, bandTop: 220, bandBot: 470 });
+  check("lifting the finger holds the lane and height", Math.abs(b.y - held) < 0.01 && Math.abs(b.screenY - heldY) < 0.01);
+})();
+
+(function dragDownNeverBack() {
+  const b = bird(220, 0, 0);
+  b.screenY = 360;
+  const lane0 = b.y;
+  const s0 = b.screenY;
+  let backed = false;
+  for (let i = 0; i < 40; i++) {
+    F.stepFollow(b, { down: true, aimX: 300, fingerY: 540, bandTop: 200, bandBot: 480 });
+    if (b.screenY > s0 + 0.001) backed = true;
+  }
+  check("a downward drag never moves the bird backward", !backed, "sy=" + b.screenY);
+  check("a downward drag still follows sideways", b.y > lane0 + 8, "y=" + b.y.toFixed(1));
+  check("a downward drag holds height", Math.abs(b.screenY - s0) < 0.001, "sy=" + b.screenY);
+})();
+
+(function speedBoostStaysForward() {
+  const b = bird(240, 1.6, 2.4);
+  const y0 = b.y;
+  const steer0 = b.steer;
+  const r = F.stepBoost(b);
+  check("a speed boost adds no horizontal velocity", r.dy === 0 && r.boostVx === 0 && b.y === y0 && b.boostSide === 0, JSON.stringify(r));
+  check("a speed boost keeps the heading forward", Math.abs(r.heading - (-Math.PI / 2)) < 0.0001 && b.steer === steer0, "h=" + r.heading);
+})();
+
 if (fails) {
   console.error(fails + " flight checks failed");
   process.exit(1);
