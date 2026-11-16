@@ -1,9 +1,7 @@
 /**
- * Sky Hop 1.21 code 36 flight.
- * East: hold to rise, release to glide. Climb: no sideways gravity.
- * The course cross-axis is bird.y. At a north heading the camera yaws -90°,
- * so a positive bird.y velocity is a slide toward screen-right. Code 35 kept
- * adding GRAVITY (0.38) on that axis during a climb, which is the drift.
+ * Sky Hop 1.21 code 39 flight.
+ * The bird always climbs north. bird.y is the left/right lane.
+ * A positive lane speed is screen-right. Edges stop the bird; they do not kill.
  */
 (function (root, factory) {
   var api = factory();
@@ -51,35 +49,16 @@
   }
 
   /**
-   * north is 0 while cruising east and 1 on a full climb.
-   * steer is -1 (screen left), 0, or 1 (screen right).
+   * Always a north climb. steer is -1 (screen left), 0, or 1 (screen right).
+   * The north argument is ignored so a side heading cannot come back.
    */
   function stepBird(b, input) {
-    var north = input.north || 0;
-    var held = !!input.held;
     var steerIn = input.steer || 0;
-    var gravMul = input.gravMul == null ? 1 : input.gravMul;
     if (b.steer == null) b.steer = 0;
-    if (north < 0.2) {
-      b.vy = stepEast(b.vy, held, gravMul);
-      b.steer *= 0.8;
-      if (Math.abs(b.steer) < 0.04) b.steer = 0;
-      b.y += b.vy;
-    } else if (north > 0.8) {
-      b.vy *= 0.5;
-      if (Math.abs(b.vy) < 0.08) b.vy = 0;
-      b.steer = stepSteer(b.steer, steerIn);
-      b.y += b.vy + b.steer;
-    } else {
-      var fade = (north - 0.2) / 0.6;
-      if (held) b.vy += FLIGHT.RISE_ACCEL * (1 - fade);
-      else b.vy += FLIGHT.GLIDE_ACCEL * gravMul * (1 - fade);
-      b.vy *= (1 - 0.18 * fade);
-      if (b.vy < FLIGHT.MAX_RISE) b.vy = FLIGHT.MAX_RISE;
-      if (b.vy > FLIGHT.MAX_GLIDE) b.vy = FLIGHT.MAX_GLIDE;
-      b.steer = stepSteer(b.steer, steerIn);
-      b.y += b.vy * (1 - fade) + b.steer * fade;
-    }
+    b.vy *= 0.5;
+    if (Math.abs(b.vy) < 0.08) b.vy = 0;
+    b.steer = stepSteer(b.steer, steerIn);
+    b.y += b.vy + b.steer;
     var r = b.r || 16;
     var playH = b.playH || 520;
     var minY = r + FLIGHT.EDGE_PAD;

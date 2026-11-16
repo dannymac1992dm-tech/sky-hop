@@ -74,6 +74,12 @@ function bird(y, vy, steer) {
   check("the bird stays at the edge after release", Math.abs(b.y - maxY) < 0.2, "y=" + b.y);
 })();
 
+(function noSideClimb() {
+  const b = bird(260, 0, 0);
+  for (let i = 0; i < 180; i++) F.stepBird(b, { north: 0, held: true, steer: 0 });
+  check("a held press does not start sideways flight", Math.abs(b.y - 260) < 1 && b.alive === true, "y=" + b.y);
+})();
+
 (function eastSoar() {
   let vy = 0;
   const first = F.stepEast(vy, true);

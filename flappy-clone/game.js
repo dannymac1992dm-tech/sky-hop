@@ -2124,8 +2124,10 @@
   let nextSpawn = 0;
   let gateSerial = 0;
   let runGate = 0;
-  let viewAng = 0;       // 0 east, -PI/2 north. Eased. Physics stay in course space.
+  let viewAng = -Math.PI / 2; // forward only: nose up the screen
   let flightLock = null; // debug: hold a heading for a screenshot
+  let turnFrom = 0, turnTarget = 0, turnLeft = 0, turnSafe = 0;
+  const TURN_FRAMES = 132; // ~2.2s cinematic bank from side flight into the climb
   let flightCueAt = -1;
   const BIRD_FLIP = true; // one switch. False skips the flourish entirely.
   const FLIP_FRAMES = 24; // about 0.4s
@@ -4794,32 +4796,87 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       i++;
     }
   }
+  function drawDepthBand(img, scroll, y0, scale) {
+    const dw = W * scale;
+    const dh = dw * img.height / img.width;
+    const period = Math.max(40, dh * 0.86);
+    const sc = ((scroll % period) + period) % period;
+    let y = y0 - sc;
+    let n = 0;
+    while (y < PLAY_H + 8 && n < 4) {
+      ctx.drawImage(img, (W - dw) * 0.5, y, dw, dh);
+      y += period;
+      n++;
+    }
+  }
+  function drawCloudLane(scroll, y0, ySpan, speed, size, alpha, color) {
+    const n = quality >= 2 ? 4 : 7;
+    const baseA = ctx.globalAlpha;
+    for (let i = 0; i < n; i++) {
+      const sp = speed * (0.75 + hash01(i * 2.7) * 0.5);
+      const x = ((hash01(i * 5.1) * (W + 90) + Math.sin(frame * 0.01 + i) * 6) % (W + 90) + (W + 90)) % (W + 90) - 45;
+      const y = y0 + ((hash01(i * 8.3) * ySpan + scroll * sp) % (ySpan + 30));
+      const rx = size * (0.7 + hash01(i * 4.4) * 0.6);
+      ctx.globalAlpha = baseA * alpha * (0.65 + hash01(i) * 0.35);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, rx * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = baseA;
+  }
+  function drawLightShafts() {
+    if (quality >= 2) return;
+    ctx.save();
+    ctx.globalAlpha *= 0.07;
+    ctx.fillStyle = "rgba(255,236,210,0.95)";
+    for (let i = 0; i < 3; i++) {
+      const x = W * (0.18 + i * 0.28) + Math.sin(frame * 0.012 + i * 1.7) * 12;
+      ctx.beginPath();
+      ctx.moveTo(x - 8, -10);
+      ctx.lineTo(x + 16, -10);
+      ctx.lineTo(x + 42, PLAY_H * 0.72);
+      ctx.lineTo(x - 30, PLAY_H * 0.72);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   function drawPaintedSky(d) {
     const near = REALM_ART[d.id];
     if (!near || !near.complete || !near.naturalWidth) return false;
-    const far = REALM_ART[d.id + "-far"] || near;
-    const dw = 560;
-    const dh = dw * near.height / near.width;
-    const yMin = Math.min(0, PLAY_H - dh);
-    let y = -dh * 0.2 - northAmt() * 64;
-    if (y < yMin) y = yMin;
-    if (y > 0) y = 0;
-    if (far && far.naturalWidth) drawMirroredStrip(far, dw * 1.06, dh * 1.06, paintScroll * 0.08, y + 10);
-    drawMirroredStrip(near, dw, dh, paintScroll * 0.2, y);
+    const far = (REALM_ART[d.id + "-far"] && REALM_ART[d.id + "-far"].naturalWidth) ? REALM_ART[d.id + "-far"] : near;
+    const base = ctx.globalAlpha || 1;
     ctx.save();
-    const laneY = PLAY_H * (0.46 - northAmt() * 0.08);
-    const shade = ctx.createRadialGradient(W * 0.5, laneY, 30, W * 0.5, laneY, PLAY_H * 0.62);
-    shade.addColorStop(0, "rgba(6,4,12,0.16)");
+    ctx.globalAlpha = base * 0.42;
+    drawDepthBand(far, paintScroll * 0.22, -30, 1.55);
+    ctx.restore();
+    const haze = ctx.createLinearGradient(0, 0, 0, PLAY_H * 0.7);
+    haze.addColorStop(0, "rgba(255,255,255,0.34)");
+    haze.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, W, PLAY_H * 0.7);
+    ctx.save();
+    ctx.globalAlpha = base * 0.88;
+    drawDepthBand(near, paintScroll * 0.55, 36, 1.2);
+    ctx.restore();
+    drawLightShafts();
+    drawCloudLane(paintScroll, 8, PLAY_H * 0.34, 0.45, 22, 0.28, d.cloud || "rgba(255,255,255,0.7)");
+    ctx.save();
+    const laneY = PLAY_H * 0.62;
+    const shade = ctx.createRadialGradient(W * 0.5, laneY, 24, W * 0.5, laneY, PLAY_H * 0.7);
+    shade.addColorStop(0, "rgba(6,4,12,0.10)");
     shade.addColorStop(1, "rgba(6,4,12,0)");
     ctx.fillStyle = shade;
     ctx.fillRect(0, 0, W, PLAY_H);
-    const seam = ctx.createLinearGradient(0, PLAY_H - 50, 0, PLAY_H);
-    seam.addColorStop(0, "rgba(0,0,0,0)");
-    seam.addColorStop(1, (d.ground && d.ground.base) || "rgba(0,0,0,0.35)");
-    ctx.fillStyle = seam;
-    ctx.fillRect(0, PLAY_H - 50, W, 50);
     ctx.restore();
     return true;
+  }
+  function drawNearClouds() {
+    const d = worldDefAt(worldIdx);
+    ctx.save();
+    drawCloudLane(paintScroll, PLAY_H * 0.58, PLAY_H * 0.42, 1.15, 40, 0.22, d.cloud || "rgba(255,255,255,0.75)");
+    ctx.restore();
   }
   function drawWorldBackground(wi, alpha) {
     const d = worldDefAt(wi);
@@ -4851,7 +4908,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, sky[0]);
     g.addColorStop(0.62, sky[1] || sky[0]);
-    g.addColorStop(1, (d.ground && d.ground.base) || sky[2] || sky[0]);
+    g.addColorStop(1, sky[2] || sky[0]);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
   }
@@ -4865,52 +4922,25 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function drawWorldGround() {
-    const k = northAmt();
-    if (k > 0.08) return;
-    if (worldDefAt(worldIdx).id === "space" && worldFade < 0.999) return;
-    const d = worldDefAt(worldIdx);
-    ctx.save();
-    if (k > 0.2) ctx.globalAlpha *= 1 - (k - 0.2) / 0.72;
-    if (!d.ground) { drawGround(); ctx.restore(); return; }
-    const gs = worldGroundSprite(worldIdx);
-    const off = ((((groundX - scrollAlpha(1)) % GROUND_TILE) + GROUND_TILE) % GROUND_TILE) - GROUND_TILE;
-    ctx.drawImage(gs.c, off, PLAY_H, gs.w, gs.h);
-    ctx.restore();
   }
 
-  // Weather in front of the background (cheap: ≤ 24 dots, no allocation)
   function drawWorldWeather() {
     const d = worldDefAt(worldIdx);
-    if (d.bubbles || d.embers || d.sprinkles) { drawWorldWeather111(d); return; }
-    if (!d.snow && !d.petals) return;
-    const n = quality >= 2 ? 12 : 24;
-    ctx.fillStyle = d.snow ? "rgba(255,255,255,0.85)" : "rgba(255,160,200,0.85)";
+    if (!(d.snow || d.petals || d.bubbles || d.embers || d.sprinkles)) return;
+    const n = quality >= 2 ? 8 : 16;
+    const base = ctx.globalAlpha;
     for (let i = 0; i < n; i++) {
-      const sp = 0.5 + hash01(i * 3.3) * 0.8;
-      const x = ((hash01(i) * (W + 40) - frame * sp * (d.snow ? 0.6 : 1.1)) % (W + 40) + (W + 40)) % (W + 40) - 20;
-      const y = ((hash01(i * 7.7) * PLAY_H + frame * sp * (d.snow ? 0.9 : 0.6)) % PLAY_H);
-      const r = d.snow ? 1.2 + hash01(i * 2.2) * 1.6 : 2;
-      if (d.snow) ctx.fillRect(x, y, r, r);
-      else { ctx.beginPath(); ctx.ellipse(x, y, r * 1.4, r * 0.8, i, 0, Math.PI * 2); ctx.fill(); }
+      const sp = 0.55 + hash01(i * 3.1) * 0.7;
+      const x = ((hash01(i) * (W + 16) + Math.sin(frame * 0.02 + i) * 4) % (W + 16) + (W + 16)) % (W + 16) - 8;
+      const y = ((hash01(i * 7.7) * (PLAY_H + 20) + frame * sp * 1.6) % (PLAY_H + 20));
+      const rad = 1.1 + hash01(i * 2.2) * (y / PLAY_H) * 1.6;
+      ctx.globalAlpha = base * (0.25 + (y / PLAY_H) * 0.35);
+      ctx.fillStyle = d.snow ? "#f4f8ff" : (d.petals ? "#ffd4e4" : (d.embers ? "#ffb15a" : (d.cloud || "#ffffff")));
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fill();
     }
-  }
-
-  const SPRINKLE_C = ["#ff5c8a", "#7ad0ff", "#ffe066", "#9bff9b"];
-  function drawWorldWeather111(d) {
-    const n = quality >= 2 ? 10 : 20;
-    for (let i = 0; i < n; i++) {
-      const sp = 0.5 + hash01(i * 3.3) * 0.8;
-      const x = ((hash01(i) * (W + 40) - frame * sp * 0.5) % (W + 40) + (W + 40)) % (W + 40) - 20;
-      if (d.bubbles || d.embers) {
-        const y = PLAY_H - ((hash01(i * 7.7) * PLAY_H + frame * sp * (d.bubbles ? 0.9 : 1.3)) % PLAY_H);
-        if (d.bubbles) { ctx.strokeStyle = "rgba(220,250,255,0.6)"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 2 + hash01(i * 2.2) * 3, 0, Math.PI * 2); ctx.stroke(); }
-        else { ctx.fillStyle = i % 3 ? "rgba(255,140,40,0.8)" : "rgba(255,220,120,0.8)"; ctx.fillRect(x, y, 2, 2); }
-      } else {
-        const y = (hash01(i * 7.7) * PLAY_H + frame * sp * 0.7) % PLAY_H;
-        ctx.fillStyle = SPRINKLE_C[i % 4];
-        ctx.fillRect(x, y, 4, 1.6);
-      }
-    }
+    ctx.globalAlpha = base;
   }
 
   function drawBossOverlay() {
@@ -6316,7 +6346,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shopToastText = "⚑ Continuing from Level " + formatLevel(level) + " checkpoint";
     }
     runGate = 0;
-    viewAng = 0;
+    viewAng = -Math.PI / 2;
     flightLock = null;
     flightCueAt = -1;
     flipLeft = 0;
@@ -7123,21 +7153,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     return Math.abs(err) < 14 ? 0 : (err > 0 ? 1 : -1);
   }
   function syncFlightHold() {
-    const k = northAmt();
     const touching = flyIds.size > 0;
-    if (k > 0.72) {
-      flyHeld = false;
-      if (keySteer) steerDir = keySteer;
-      else if (touching) steerDir = lastFlyX < W * 0.5 ? -1 : 1;
-      else if (debugAuto) steerDir = debugClimbSteer();
-      else steerDir = 0;
-    } else if (k > 0.28) {
-      flyHeld = touching || keyFly;
-      steerDir = keySteer || (touching ? (lastFlyX < W * 0.5 ? -1 : 1) : 0);
-    } else {
-      flyHeld = touching || keyFly;
-      steerDir = keySteer || 0;
-    }
+    flyHeld = false;
+    if (keySteer) steerDir = keySteer;
+    else if (touching) steerDir = lastFlyX < W * 0.5 ? -1 : 1;
+    else if (debugAuto) steerDir = debugClimbSteer();
+    else steerDir = 0;
   }
 
   function handlePointerAt(pt) {
@@ -7435,6 +7456,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   // —— Pipes ——
   function spawnPipe() {
+    if (turnSafe > 0) return;
     hitchNote("spawn");
     const margin = gapMargin;
     const gap = pipeGap;
@@ -7502,11 +7524,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     np.beatRole = built.beat ? built.beat.role : "";
     np.beatCue = built.beat && built.beat.cue;
     np.gateIndex = gi;
-    np.flightDir = leg ? leg.dir : "east";
+    np.flightDir = "north";
     if (leg && leg.cue) {
       const sub = np.beatCue || (leg.turn === "north" ? "Turning up" : leg.dir === "north" ? "Ahead" : "Leveling");
       showBigBanner(leg.cue, sub, "#ffe7b0");
-      if (BIRD_FLIP && flipLeft <= 0) flipLeft = FLIP_FRAMES;
+      // A heading change is a rigid bank, not a spin.
     }
     else if (np.beatCue) showBigBanner(np.beatCue, np.beatRole === "challenge" ? "Short section" : "Easy stretch", np.beatRole === "reward" ? "#ffe08a" : "#ffffff");
     np.pattern = built.pattern;
@@ -7550,6 +7572,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   // —— Extras spawn helpers ——
   function spawnTree(forceHazard) {
+    return;
     const layer = Math.random() < 0.45 ? "bg" : "fg";
     const hazard = false;
     // Light scenery trees even when extras off (bg only, never hazard)
@@ -7583,6 +7606,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const kinds = ["bunny", "butterfly", "squirrel", "dragonfly"];
     const kind = kinds[Math.floor(Math.random() * kinds.length)];
     const flying = kind === "butterfly" || kind === "dragonfly";
+    if (!flying) return;
     let y;
     if (flying) {
       y = 40 + Math.random() * (PLAY_H - 100);
@@ -7626,6 +7650,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function spawnWaterfall() {
+    return;
     const push = extrasOn && level >= 18 && Math.random() < 0.35 + difficultyT(level) * 0.25;
     let x = W + 20;
     // Don't put push zones smack in pipe gaps vertically — width is vertical band
@@ -7809,7 +7834,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
     }
     if (window.SkyHopFlight) {
-      const rising = state === State.PLAY && (flyHeld || keyFly || bird.vy < -0.45) && northAmt() < 0.72;
+      const rising = state === State.PLAY;
       bird.wingPose = window.SkyHopFlight.wingMotion(bird.wingPhase, rising);
       bird.wingPhase = bird.wingPose.phase;
       bird.wing = 0.5 + Math.sin(bird.wingPhase) * 0.5 * bird.wingPose.depth;
@@ -7877,8 +7902,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         addParticle(bird.x - 14, bird.y + (Math.random() * 10 - 5), -6, 0, 10, 10, "#fff4d0", 2);
       }
     } else if (puMode !== "rocket" && window.SkyHopFlight) {
-      const held = north > 0.72 ? false : (flyHeld || keyFly);
-      window.SkyHopFlight.stepBird(bird, { north: north, held: held, steer: steerDir, gravMul: puMode === "ship" ? perkGrav * 0.6 : perkGrav });
+      window.SkyHopFlight.stepBird(bird, { north: 1, held: false, steer: steerDir, gravMul: puMode === "ship" ? perkGrav * 0.6 : perkGrav });
     } else if (puMode !== "rocket") {
       bird.vy = Math.min(bird.vy + GRAVITY * perkGrav, MAX_FALL);
       bird.y += bird.vy;
@@ -7923,7 +7947,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
 
       if (puMode === "power" && !p.smashed && powerHits(p)) smashPipe(p, bird.x + 12, bird.y);
-      if (!(ghostPipesLeft > 0 || p.ghostPass || puMode) && hitPipe(p)) {
+      if (turnSafe <= 0 && !(ghostPipesLeft > 0 || p.ghostPass || puMode) && hitPipe(p)) {
         // Grace: emerging from a dash/shield hit inside a pipe shouldn't insta-kill
         if (invulnFrames > 0 && invulnFrames < 4 && graceBudget > 0) invulnFrames = 3;
         gameOver();
@@ -8723,9 +8747,31 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         ctx.stroke();
         ctx.restore();
       }
+      const ahead = Math.max(0, Math.min(1, (q.x - bird.x) / 340));
+      const sc = 0.55 + (1 - ahead) * 0.62;
+      ctx.save();
+      ctx.translate(q.x - 9, q.y);
+      ctx.globalAlpha = 0.22 * (1 - ahead * 0.4);
+      ctx.scale(sc, sc);
+      ctx.fillStyle = "rgba(10,8,16,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, bit.r * 0.7, bit.r * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       ctx.save();
       ctx.translate(q.x, q.y);
+      ctx.globalAlpha *= 0.5 + (1 - ahead) * 0.5;
+      ctx.scale(sc, sc * (0.9 + (1 - ahead) * 0.12));
       drawGateBit(bit, p.wi);
+      ctx.globalAlpha *= 0.35;
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath();
+      ctx.ellipse(-bit.r * 0.22, -bit.r * 0.28, bit.r * 0.28, bit.r * 0.16, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(20,12,24,0.45)";
+      ctx.beginPath();
+      ctx.ellipse(bit.r * 0.1, bit.r * 0.42, bit.r * 0.46, bit.r * 0.2, 0.2, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }
@@ -8950,12 +8996,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   // Painted phoenix sprites (code 35). The body stays near the hit circle; the tail may hang past it.
   const PHOENIX_ART = {
     side: {
-      canvas: [1192, 738], anchor: [846, 395], drawW: 156, frames: [null, null, null],
-      pivots: [[831, 413], [824, 394], [827, 411]]
+      canvas: [1589, 984], anchor: [1128, 526], drawW: 156, frames: [null, null, null],
+      pivots: [[1108, 551], [1099, 525], [1103, 548]]
     },
     climb: {
-      canvas: [843, 1135], anchor: [423, 269], drawW: 58, frames: [null, null, null],
-      pivots: [[424, 312], [424, 305], [423, 307]]
+      canvas: [1124, 1513], anchor: [564, 359], drawW: 58, frames: [null, null, null],
+      pivots: [[565, 416], [565, 407], [564, 409]]
     },
     ready: false
   };
@@ -8968,7 +9014,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
           PHOENIX_ART[kind].frames[i] = img;
           if (--left === 0) PHOENIX_ART.ready = true;
         };
-        img.src = "art/phoenix/" + kind + "-" + i + ".png?v=35";
+        img.src = "art/phoenix/" + kind + "-" + i + ".png?v=39";
       }
     });
   })();
@@ -9021,21 +9067,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const st = scStep(pal && pal.evo);
     const scale = spec.drawW / spec.canvas[0];
     const w = spec.canvas[0] * scale, h = spec.canvas[1] * scale;
-    imgA = phoenixSharp(kind, aIdx, imgA);
-    imgB = phoenixSharp(kind, bIdx, imgB);
     const baseA = ctx.globalAlpha;
+    const rs = renderScale || 1;
+    const deviceW = w * rs;
+    const srcW = (imgA.naturalWidth || imgA.width || spec.canvas[0]);
+    ctx.imageSmoothingEnabled = deviceW < srcW;
+    ctx.imageSmoothingQuality = "high";
     function blitFrame(img, idx, alpha) {
       if (!img || alpha < 0.02) return;
       const piv = (spec.pivots && spec.pivots[idx]) || spec.anchor;
       ctx.globalAlpha = baseA * alpha;
-      ctx.drawImage(img, -piv[0] * scale, -piv[1] * scale, w, h);
-    }
-    if (st > 6) {
-      ctx.save();
-      ctx.globalAlpha = Math.min(0.22, 0.04 + st * 0.006);
-      ctx.fillStyle = "#ffb03a";
-      ctx.beginPath(); ctx.ellipse(0, 2, 16, 12, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
+      const ox = Math.round(-piv[0] * scale * rs) / rs;
+      const oy = Math.round(-piv[1] * scale * rs) / rs;
+      ctx.drawImage(img, ox, oy, w, h);
     }
     blitFrame(imgA, aIdx, 1 - blend);
     blitFrame(imgB, bIdx, blend);
@@ -10919,13 +10963,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function drawWorldExtras(layer) {
     // layer: "bg" before pipes, "fg" after pipes
+    const showLand = false;
     if (layer === "bg") {
-      for (const wf of waterfalls) drawWaterfall(wf);
-      for (const t of trees) {
+      if (showLand) for (const wf of waterfalls) drawWaterfall(wf);
+      if (showLand) for (const t of trees) {
         if (t.layer === "bg") drawTree(t);
       }
     } else {
-      for (const t of trees) {
+      if (showLand) for (const t of trees) {
         if (t.layer === "fg") drawTree(t);
       }
       for (const a of animals) drawAnimal(a);
@@ -12575,21 +12620,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function northAmt() {
-    return Math.max(0, Math.min(1, -viewAng / (Math.PI / 2)));
+    return 1;
   }
   function tickFlight() {
-    if (flipLeft > 0) flipLeft--;
-    if (flightLock != null) { viewAng = flightLock; return; }
-    const O = window.SkyHopObstacles;
-    if (!O || !O.flightLeg) return;
-    let gi = runGate;
-    for (let i = 0; i < pipes.length; i++) {
-      if (!pipes[i].scored && pipes[i].gateIndex != null) { gi = pipes[i].gateIndex; break; }
-    }
-    const leg = O.flightLeg(gi);
-    const target = leg.ang;
-    viewAng += (target - viewAng) * 0.036;
-    if (Math.abs(target - viewAng) < 0.004) viewAng = target;
+    if (flipLeft > 0) flipLeft = 0;
+    turnLeft = 0;
+    turnSafe = 0;
+    viewAng = -Math.PI / 2;
   }
   function upBlend() {
     const k = northAmt();
@@ -12605,7 +12642,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     return -Math.PI * 2 * e;
   }
   function courseScale() {
-    return 1 + (W / PLAY_H - 1) * northAmt();
+    return 1;
   }
   /** Screen point the bird occupies. East keeps the course position. A climb sits low, nose toward the landmark. */
   function birdScreenPos() {
@@ -12615,11 +12652,17 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       y: bird.y + (PLAY_H * 0.82 - bird.y) * k
     };
   }
+  function cameraLean() {
+    const a = (bird.steer || 0) * 0.022;
+    if (a > 0.07) return 0.07;
+    if (a < -0.07) return -0.07;
+    return a;
+  }
   function applyCourseCamera() {
     const p = birdScreenPos();
     const s = courseScale();
     ctx.translate(p.x, p.y);
-    ctx.rotate(viewAng);
+    ctx.rotate(-Math.PI / 2 + cameraLean());
     ctx.scale(s, s);
     ctx.translate(-bird.x, -bird.y);
   }
@@ -12647,37 +12690,26 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const rs = renderScale || 1;
     const p = { x: Math.round(rawP.x * rs) / rs, y: Math.round(rawP.y * rs) / rs };
     const s = courseScale();
-    const up = upBlend();
-    const spin = flipAngle();
     const pal = activeBirdPalette(evoPipes());
     ctx.save();
+    ctx.translate(p.x, p.y + 16);
+    ctx.fillStyle = "rgba(20,10,24,0.28)";
+    ctx.beginPath();
+    ctx.ellipse((bird.steer || 0) * 1.5, 0, 14, 4.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
     ctx.translate(p.x, p.y);
-    if (spin) ctx.rotate(spin);
-    if (up < 0.995) {
-      ctx.save();
-      ctx.globalAlpha *= (1 - up);
-      ctx.rotate(viewAng * (1 - up));
-      ctx.scale(s, s);
-      ctx.translate(-bird.x, -bird.y);
-      if (state !== State.START) drawPuModeBack();
-      drawBird();
-      ctx.restore();
+    ctx.rotate(window.SkyHopFlight ? window.SkyHopFlight.noseAngle(bird.steer || 0) : 0);
+    ctx.scale(s, s);
+    if (state === State.PLAY && puMagnetFrames > 0) {
+      ctx.strokeStyle = "#ff7fb0";
+      ctx.lineWidth = 2;
+      ctx.globalAlpha *= 0.85;
+      ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
     }
-    if (up > 0.005) {
-      ctx.save();
-      ctx.globalAlpha *= up;
-      ctx.rotate(window.SkyHopFlight ? window.SkyHopFlight.noseAngle(bird.steer || 0) : 0);
-      ctx.scale(s, s);
-      if (state === State.PLAY && puMagnetFrames > 0) {
-        ctx.strokeStyle = "#ff7fb0";
-        ctx.lineWidth = 2;
-        ctx.globalAlpha *= 0.85;
-        ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
-        ctx.globalAlpha = up;
-      }
-      drawBirdUp(pal, bird.wing);
-      ctx.restore();
-    }
+    drawBirdUp(pal, bird.wing);
     ctx.restore();
   }
   const MARK = {
@@ -12841,6 +12873,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.restore();
     ctx.restore();
     drawBirdHeading();
+    drawNearClouds();
     bird.y = by;
     drawBossOverlay();
 
@@ -13122,6 +13155,30 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shopRows: function () { return buildShopRows().map(function (r) { return { title: r.title, header: r.header, sub: r.sub, chips: (r.chips || []).map(function (c) { return { label: c.label, action: c.action, itemId: c.itemId }; }) }; }); },
       setShopScroll: function (y) { shopScroll = y; clampShopScroll(); },
       clearHazardsForShot: function () { trees.length = 0; animals.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
+      artReady: function () { return !!PHOENIX_ART.ready; },
+      beginBank: function () {
+        flightLock = null;
+        freeze112 = true;
+        pipes.length = 0;
+        turnFrom = 0;
+        turnTarget = -Math.PI / 2;
+        turnLeft = TURN_FRAMES;
+        turnSafe = TURN_FRAMES;
+        viewAng = -Math.PI / 2;
+        bird.y = PLAY_H * 0.45;
+        bird.vy = 0;
+        bird.steer = 0;
+      },
+      stepBank: function () {
+        if (turnLeft > 0) {
+          turnLeft--;
+          const u = 1 - turnLeft / TURN_FRAMES;
+          const e = u * u * (3 - 2 * u);
+          viewAng = turnFrom + (turnTarget - turnFrom) * e;
+        }
+        render();
+        return { left: turnLeft, ang: viewAng, north: northAmt() };
+      },
       buttons: function () { return JSON.parse(JSON.stringify(uiButtons)); },
       expectedSpeed: function (lv, sc) { const t = difficultyT(lv); let sp = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t; const early = 1 - Math.max(0, Math.min(20, sc)) / 20; if (early > 0.02) sp *= 1 - 0.24 * early; return sp * midEase(lv).speedMul; },
       oldSpeed: function (lv) { const t = difficultyT(lv); return BASE_SPEED + (MAX_SPEED - BASE_SPEED) * t; },

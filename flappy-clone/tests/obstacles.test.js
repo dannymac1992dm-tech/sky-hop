@@ -191,15 +191,18 @@ const leg8 = O.flightLeg(8);
 const leg12 = O.flightLeg(12);
 const leg17 = O.flightLeg(17);
 const leg20 = O.flightLeg(20);
-check("cycle opens side-scrolling", leg0.dir === "east" && leg0.ang === 0, JSON.stringify(leg0));
-check("first challenge stays side-scrolling", leg5.dir === "east" && sixth.role === "challenge");
-check("a bank north follows the first challenge", leg8.dir === "turn" && leg8.turn === "north" && leg8.cue === "Banking north");
+check("cycle opens flying north", leg0.dir === "north" && leg0.ang === -Math.PI / 2 && !leg0.turn && !leg0.cue, JSON.stringify(leg0));
+check("first challenge stays flying north", leg5.dir === "north" && leg5.ang === -Math.PI / 2 && sixth.role === "challenge");
+check("no bank away from north", leg8.dir === "north" && !leg8.turn && leg8.cue == null);
 check("the second challenge climbs", leg12.dir === "north" && O.beatFor(12).role === "challenge");
-check("bonus gates level back east", leg17.dir === "turn" && leg17.turn === "east");
-check("the next cycle returns to east", leg20.dir === "east" && leg20.step === 0);
-let dirs = {};
-for (let i = 0; i < 20; i++) dirs[O.flightLeg(i).dir] = 1;
-check("each cycle mixes east, a turn, and north", dirs.east && dirs.turn && dirs.north);
+check("bonus gates stay north", leg17.dir === "north" && !leg17.turn && leg17.ang === -Math.PI / 2);
+check("the next cycle stays north", leg20.dir === "north" && leg20.step === 0 && leg20.ang === -Math.PI / 2);
+let sideGate = 0;
+for (let i = 0; i < 80; i++) {
+  const leg = O.flightLeg(i);
+  if (leg.dir !== "north" || leg.turn || leg.ang !== -Math.PI / 2) sideGate++;
+}
+check("no gate is side-scrolling or a turn", sideGate === 0, "side=" + sideGate);
 for (let i = 0; i < 120; i++) {
   const b = O.beatFor(i);
   const gate = O.layoutGate({ level: 12, serial: i, gateIndex: i, worldIndex: 0, playH: PLAY_H, gap: 140, gapMin: 140, gapY0: 260, pAmp: 0, rng: O.mulberry(i + 9) });

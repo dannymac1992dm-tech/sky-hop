@@ -275,20 +275,12 @@
   }
 
   /**
-   * Flight heading for the same 20-gate cycle.
-   * 0–7 east (side-scroll, includes the first challenge), 8–10 bank north,
-   * 11–16 climb toward the realm landmark, 17–19 level back to east.
-   * ang is the heading the camera eases toward. 0 is east, -PI/2 is north.
+   * Every gate flies north. There is no side-scroll and no turn back to east.
+   * ang -PI/2 points the nose up the screen, toward the realm landmark.
    */
   function flightLeg(index) {
     index = Math.max(0, index | 0);
-    var step = index % 20;
-    var dir, turn, cue, ang;
-    if (step < 8) { dir = "east"; turn = null; cue = null; ang = 0; }
-    else if (step < 11) { dir = "turn"; turn = "north"; cue = step === 8 ? "Banking north" : null; ang = -Math.PI / 2; }
-    else if (step < 17) { dir = "north"; turn = null; cue = step === 11 ? "Climbing" : null; ang = -Math.PI / 2; }
-    else { dir = "turn"; turn = "east"; cue = step === 17 ? "Leveling out" : null; ang = 0; }
-    return { index: index, step: step, dir: dir, turn: turn, cue: cue, ang: ang };
+    return { index: index, step: index % 20, dir: "north", turn: null, cue: null, ang: -Math.PI / 2 };
   }
 
   function layoutGate(opts) {
