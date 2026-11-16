@@ -103,6 +103,8 @@
     };
   }
 
+  var WORLD_LEVELS = 5;
+
   function bandIndex(level) {
     if (level < 40) return 0;
     if (level < 200) return 1;
@@ -131,7 +133,7 @@
     if (milestone) return "ring";
     if (boss) return rng() < 0.55 ? "gauntlet" : "ring";
     if (level <= 8) return "solo";
-    var worldOpen = level > 1 && ((level - 1) % 20) === 0;
+    var worldOpen = level > 1 && ((level - 1) % WORLD_LEVELS) === 0;
     if (worldOpen) return rng() < 0.65 ? "solo" : "stagger";
     if (level < 30) return rng() < 0.7 ? "solo" : "stagger";
     if (level < 80) return pickWeighted(rng, ["solo", "stagger", "gateway", "bob"], [0.22, 0.38, 0.24, 0.16]);
@@ -145,8 +147,8 @@
     var w = worldSlot(worldIndex);
     var list = w.def.bands[bandIndex(level)].slice();
     var next = WORLD_BANDS[(w.mod + 1) % WORLD_BANDS.length];
-    var phase = (level - 1) % 20;
-    if (phase >= 17) list.push(next.bands[0][0]);
+    var phase = (level - 1) % WORLD_LEVELS;
+    if (phase >= WORLD_LEVELS - 1) list.push(next.bands[0][0]);
     if (w.lap >= 1 && level >= 180) list.push(next.bands[Math.min(1, next.bands.length - 1)][0]);
     if (level >= 40) list.push("critter");
     return { list: list, primary: w.def.bands[0][0], world: w.def, lap: w.lap, mod: w.mod };
@@ -369,7 +371,7 @@
         gapY0: gapY0, pAmp: pAmp, half: half, playH: playH, spin: 0
       });
     }
-    if ((level - 1) % 20 >= 17 && bits.length) {
+    if ((level - 1) % WORLD_LEVELS >= WORLD_LEVELS - 1 && bits.length) {
       var accent = WORLD_BANDS[(pool.mod + 1) % WORLD_BANDS.length].bands[0][0];
       bits[bits.length - 1].kind = accent;
     }
@@ -475,6 +477,9 @@
     beatFor: beatFor,
     flightLeg: flightLeg,
     dailySeed: dailySeed,
-    BEAT_CUES: BEAT_CUES
+    BEAT_CUES: BEAT_CUES,
+    WORLD_LEVELS: WORLD_LEVELS,
+    worldIndex: function (level) { return Math.floor((Math.max(1, level | 0) - 1) / WORLD_LEVELS); },
+    worldPhase: function (level) { return (Math.max(1, level | 0) - 1) % WORLD_LEVELS; }
   };
 })(typeof window !== "undefined" ? window : globalThis);

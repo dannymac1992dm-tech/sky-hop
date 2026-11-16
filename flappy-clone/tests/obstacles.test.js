@@ -236,6 +236,11 @@ check("old evo and tree stay", kept.evo === 20 && kept.tree.glide === 2 && kept.
 const late = E.masterySync(kept, 8000);
 check("late mastery grants the later choices", late.length >= 4 && kept.mastery.anchor === 1, JSON.stringify(late));
 check("early peak does not grant late mastery", E.masterySync({ mastery: {} }, 100).length === 0);
+check("levels 1-5 are world 0", O.worldIndex(1) === 0 && O.worldIndex(5) === 0 && O.worldPhase(5) === 4);
+check("level 6 starts world 2", O.worldIndex(6) === 1 && O.worldPhase(6) === 0);
+check("level 11 starts world 3", O.worldIndex(11) === 2);
+check("nine worlds then the cycle repeats", O.WORLD_LEVELS === 5 && O.worldIndex(46) === 9);
+check("the last level of a world previews the next", O.poolFor(0, 5).list.indexOf(O.poolFor(1, 1).primary) >= 0);
 
 if (fails) {
   console.error(fails + " checks failed");

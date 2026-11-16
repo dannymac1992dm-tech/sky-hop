@@ -2830,7 +2830,7 @@
   // —— v1.10: worlds every 25 levels, moving pipes (50+), boss levels (every 10), power-ups ——
   // All art and music below is drawn / synthesized in code (original; see AUDIO-LICENSE.md).
   // ======================================================================================
-  const WORLD_EVERY = 20; // v1.11: a new world every 20 levels (1-20, 21-40, ...)
+  const WORLD_EVERY = 5; // a new world every 5 levels (1-5, 6-10, ...), 25 obstacles apart
   const BOSS_EVERY = 10;
   const BOSS_SPEED_MUL = 1.22;
   const ROMAN = ["", " II", " III", " IV", " V", " VI", " VII", " VIII", " IX", " X"];
@@ -13411,7 +13411,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     candy: ["Aurora Spire", "#c49bff", "#7ec8ff"]
   };
   function landmarkGrow() {
-    const worldT = ((Math.max(1, level) - 1) % 20) / 19;
+    const span = Math.max(1, WORLD_EVERY - 1);
+    const worldT = ((Math.max(1, level) - 1) % WORLD_EVERY) / span;
     return 0.36 + 0.78 * Math.max(worldT * 0.42, northAmt());
   }
   function drawLandmark() {
