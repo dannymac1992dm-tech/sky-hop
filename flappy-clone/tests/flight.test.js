@@ -144,6 +144,34 @@ function bird(y, vy, steer) {
   check("a turn hands vertical speed off instead of drifting", Math.abs(b.y - 260) < 80 && b.vy === 0, "y=" + b.y.toFixed(2) + " vy=" + b.vy);
 })();
 
+(function levelBoundaryKeepsTicking() {
+  let frame = 0;
+  let level = 1;
+  let score = 0;
+  let banner = null;
+  let blocked = 0;
+  const b = bird(260, 0, 0);
+  const startY = b.y;
+  for (let i = 0; i < 48; i++) {
+    frame++;
+    score++;
+    const next = 1 + Math.floor(score / 5);
+    if (next > level) {
+      banner = F.beginLevelBanner(level, score);
+      level = next;
+    }
+    if (banner && banner.blocks) blocked++;
+    banner = F.stepLevelBanner(banner);
+    F.stepBird(b, { north: 1, held: false, steer: 1 });
+  }
+  check("the loop keeps ticking across a level boundary", frame === 48 && level > 1 && b.y > startY + 20, "frame=" + frame + " level=" + level + " y=" + b.y.toFixed(1));
+  check("the level banner does not block the loop", blocked === 0 && banner && banner.blocks === false, JSON.stringify(banner));
+  let left = banner;
+  let steps = 0;
+  while (left && steps < 200) { left = F.stepLevelBanner(left); steps++; }
+  check("the level banner fades on its own", left == null && steps > 20 && steps < F.LEVEL_BANNER_FRAMES, "steps=" + steps);
+})();
+
 if (fails) {
   console.error(fails + " flight checks failed");
   process.exit(1);
