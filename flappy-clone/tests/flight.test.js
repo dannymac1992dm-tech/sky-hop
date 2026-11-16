@@ -178,8 +178,28 @@ function bird(y, vy, steer) {
   check("the bird stays above the finger", b.screenY < 280, "sy=" + b.screenY.toFixed(1));
   const held = b.y;
   const heldY = b.screenY;
-  for (let i = 0; i < 20; i++) F.stepFollow(b, { down: false, bandTop: 220, bandBot: 470 });
-  check("lifting the finger holds the lane and height", Math.abs(b.y - held) < 0.01 && Math.abs(b.screenY - heldY) < 0.01);
+  for (let i = 0; i < 30; i++) F.stepFollow(b, { down: false, restX: 200, restY: 480, bandTop: 220, bandBot: 480 });
+  check("lifting the finger eases back toward the middle", Math.abs(b.y - 200) < Math.abs(held - 200));
+  check("lifting the finger eases back down toward the rest line", b.screenY > heldY && b.screenY <= 480.01, "sy=" + b.screenY);
+})();
+
+(function restSpotAndCap() {
+  const b = bird(320, 0, 0);
+  b.screenY = 360;
+  for (let i = 0; i < 90; i++) F.stepFollow(b, { down: false, restX: 260, restY: 480, bandTop: 330, bandBot: 480 });
+  check("the bird returns to bottom middle", Math.abs(b.y - 260) < 6 && Math.abs(b.screenY - 480) < 6, "y=" + b.y.toFixed(1) + " sy=" + b.screenY.toFixed(1));
+  const climber = bird(260, 0, 0);
+  climber.screenY = 480;
+  for (let i = 0; i < 80; i++) F.stepFollow(climber, { down: true, aimX: 260, fingerY: 80, bandTop: 330, bandBot: 480 });
+  check("forward flight stops at the cap", climber.screenY >= 329.5 && climber.screenY < 400, "sy=" + climber.screenY.toFixed(1));
+  const low = bird(260, 0, 0);
+  low.screenY = 480;
+  for (let i = 0; i < 20; i++) F.stepFollow(low, { down: true, aimX: 300, fingerY: 700, bandTop: 330, bandBot: 480 });
+  check("the bird never drops below the rest line", low.screenY <= 480.01 && low.screenY >= 470);
+  const focus = F.focusFromScreen(90, 360, 480);
+  check("effects ahead of the anchor match the higher bird", focus.x === 210 && focus.ahead === 120);
+  const home = F.focusFromScreen(90, 480, 480);
+  check("at rest the focus is the anchor", home.x === 90 && home.ahead === 0);
 })();
 
 (function dragDownNeverBack() {

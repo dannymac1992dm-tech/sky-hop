@@ -105,16 +105,17 @@
       var fingerY = input.fingerY != null ? input.fingerY : b.screenY;
       var lifted = fingerY - FLIGHT.FINGER_LIFT;
       if (lifted < b.screenY) aimY = lifted;
+    } else if (input.restX != null || input.restY != null) {
+      if (input.restX != null) aimX = input.restX;
+      if (input.restY != null) aimY = input.restY;
     }
     if (input.bandTop != null && aimY < input.bandTop) aimY = input.bandTop;
     if (input.bandBot != null && aimY > input.bandBot) aimY = input.bandBot;
-    if (aimY > b.screenY) aimY = b.screenY;
+    if (input.down && aimY > b.screenY) aimY = b.screenY;
     var dx = aimX - b.y;
     var dy = aimY - b.screenY;
     var sx = clamp(dx * ease, -max, max);
-    var sy = dy * ease;
-    if (sy < -max) sy = -max;
-    if (sy > 0) sy = 0;
+    var sy = clamp(dy * ease, -max, input.down ? 0 : max);
     var y0 = b.y;
     var s0 = b.screenY;
     b.y += sx;
@@ -193,6 +194,12 @@
     var prev = pts[pts.length - 2];
     return { x: last.x, y: last.y, dx: last.x - prev.x, dy: last.y - prev.y };
   }
+
+  /** World point that sits on the rendered bird. ahead is how far up the screen the bird is from rest. */
+  function focusFromScreen(anchorX, screenY, restY) {
+    var ahead = (restY || 0) - screenY;
+    return { x: anchorX + ahead, ahead: ahead };
+  }
   function stepBoost(b) {
     var y0 = b.y;
     b.boostVx = 0;
@@ -267,6 +274,7 @@
     stepFollow: stepFollow,
     stepBoost: stepBoost,
     beamPolyline: beamPolyline,
-    pointAlong: pointAlong
+    pointAlong: pointAlong,
+    focusFromScreen: focusFromScreen
   };
 });

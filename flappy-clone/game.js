@@ -1774,8 +1774,9 @@
       else { c.pipe = null; c.x -= pipeSpeed * ws; }
       c.spin += 0.12;
       if (state === State.PLAY) {
-        const dx = bird.x - c.x;
-        const dy = bird.y - c.y;
+        const here = birdFocus();
+        const dx = here.x - c.x;
+        const dy = here.y - c.y;
         const d2 = dx * dx + dy * dy;
         if (magnetOn && d2 < R * R && (!c.risky || magPick)) {
           const d = Math.sqrt(d2) || 1;
@@ -2101,7 +2102,10 @@
   let followSX = 200;
   let followSY = 0;
   const CAM_LANE = PLAY_H / 2;
-  let birdScreenY = PLAY_H * 0.82;
+  const BIRD_REST_Y = H * 0.80;
+  const BIRD_AHEAD_Y = H * 0.55;
+  let birdScreenY = BIRD_REST_Y;
+  bird.screenY = BIRD_REST_Y;
   let keySteer = 0;
   const flyIds = new Set();
   let lastFlyX = W / 2;
@@ -3564,7 +3568,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const tg = burstTargets(false);
     for (let i = 0; i < tg.length; i++) if (hunterCover(tg[i]) < hunterHp(tg[i])) { h = tg[i]; break; }
     if (!h) { const c = pipeCandidate(); if (c) { pp = c.p; ps = c.side; } }
-    const sx = bird.x + 16, sy = bird.y + 2, sp = pelletSpeed();
+    const mouth = beakPoint();
+    const sx = mouth.x, sy = mouth.y, sp = pelletSpeed();
     let ang = (Math.random() - 0.5) * 0.12;
     if (h) ang = Math.atan2(h.y - sy, Math.max(30, h.x - sx));
     else if (pp) { const aim = pipeAim(pp, ps); ang = Math.atan2(aim.y - sy, Math.max(30, aim.x - sx)); }
@@ -3583,7 +3588,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
     if (!target) return false;   // nothing to pop yet: the rocket waits in the queue
     const spread = ((i % 3) - 1) * 0.3;
-    popRockets.push({ tr: [], x: bird.x + 22, y: bird.y + ((i % 3) - 1) * 11, a: (kind === "hunter" ? Math.atan2(target.y - (bird.y + ((i % 3) - 1) * 11), Math.max(30, target.x - bird.x - 22)) : spread * 0.8 - 0.1), sp: 4.8, life: 150, tgt: target, kind: kind, side: side, wob: i * 2 });
+    const mouth = beakPoint();
+    popRockets.push({ tr: [], x: mouth.x, y: mouth.y + ((i % 3) - 1) * 8, a: (kind === "hunter" ? Math.atan2(target.y - mouth.y, Math.max(30, target.x - mouth.x)) : spread * 0.4), sp: 4.8, life: 150, tgt: target, kind: kind, side: side, wob: i * 2 });
     sweep(260, 520, 0.14, "triangle", 0.025);
     return true;
   }
@@ -3606,7 +3612,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     return null;
   }
   function tossToy(tg) {
-    const sx = bird.x + 14, sy = bird.y + 6;
+    const mouth = beakPoint();
+    const sx = mouth.x, sy = mouth.y;
     toys.push({ sx: sx, sy: sy, x: sx, y: sy, t: 0, tgt: tg ? tg.ref : null, kind: tg ? tg.kind : "spot", side: tg ? tg.side : null, fx: tg ? (tg.kind === "pipe" ? pipeAim(tg.ref, tg.side).x : tg.ref.x) : bird.x + 130, fy: tg ? (tg.kind === "pipe" ? pipeAim(tg.ref, tg.side).y : tg.ref.y - (tg.kind === "hunter" ? 4 : 0)) : Math.min(PLAY_H - 30, bird.y + 60), spin: 0 });
     sweep(500, 340, 0.12, "triangle", 0.02);
   }
@@ -3630,7 +3637,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     zapStrikes++;
     if (zaps.length >= MAX_ZAPS) zaps.shift();
     const a = (Math.random() - 0.5) * 2.2;   // random launch direction, then a jittery zig-zag towards the target
-    zaps.push({ x: bird.x + 16, y: bird.y, a: a, t: 0, tg: tg, lx: bird.x + 16, ly: bird.y });
+    const mouth = beakPoint();
+    zaps.push({ x: mouth.x, y: mouth.y, a: a, t: 0, tg: tg, lx: mouth.x, ly: mouth.y });
     beep(900 + Math.random() * 300, 0.04, "sawtooth", 0.015);
   }
   function zapPos(tg) {
@@ -3748,16 +3756,20 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (c.life <= 0) confetti.splice(i, 1);
     }
   }
-  function beakPoint() {
+  function birdFocus() {
     const p = birdScreenPos();
+    const ahead = BIRD_REST_Y - p.y;
+    return { x: bird.x + ahead, y: bird.y, sx: p.x, sy: p.y, ahead: ahead };
+  }
+  function beakPoint() {
+    const body = birdFocus();
     const boosting = state === State.PLAY && (skillActive("dash") > 0 || puMode === "rocket");
     const ang = boosting || !window.SkyHopFlight ? 0 : window.SkyHopFlight.noseAngle(bird.steer || 0);
     const up = 16;
     const c = Math.cos(ang), s = Math.sin(ang);
-    const sx = p.x + up * s;
-    const sy = p.y - up * c;
-    const camY = PLAY_H * 0.82;
-    return { sx: sx, sy: sy, x: bird.x + (camY - sy), y: CAM_LANE + (sx - W * 0.5), ang: ang };
+    const sx = body.sx + up * s;
+    const sy = body.sy - up * c;
+    return { sx: sx, sy: sy, x: bird.x + (BIRD_REST_Y - sy), y: CAM_LANE + (sx - W * 0.5), ang: ang };
   }
   function markBeak(n) { beakPlume = Math.max(beakPlume, n || 8); }
   function fireTorch() {
@@ -3835,7 +3847,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function worldToScreen(wx, wy) {
     return {
       x: W * 0.5 + (wy - CAM_LANE),
-      y: PLAY_H * 0.82 - (wx - bird.x)
+      y: BIRD_REST_Y - (wx - bird.x)
     };
   }
   function grantFriends() {
@@ -3863,12 +3875,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (f.fade <= 0 || f.life <= 0) friends.splice(i, 1);
         continue;
       }
-      const hit = pipeSegAt(bird.x + 6, f.y, 9);
+      const fx = bird.x + (BIRD_REST_Y - f.screenY);
+      const hit = pipeSegAt(fx + 8, f.y, 9);
       if (hit) { f.leaving = true; f.life = Math.min(f.life, 36); continue; }
       if (--f.cd <= 0) {
         f.cd = 34;
-        const src = beakPoint();
-        friendBolts.push({ x: src.x - 4, y: f.y, vx: 7.2, life: 42, r: 7 });
+        friendBolts.push({ x: fx + 14, y: f.y, vx: 7.2, life: 42, r: 7 });
       }
     }
     for (let i = friendBolts.length - 1; i >= 0; i--) {
@@ -3918,8 +3930,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     } else if (fireBeams.length) fireBeams.length = 0;
     if (emberAura > 0) {
       emberAura--;
-      if ((emberAura % 6) === 0) crackPipesNear(bird.x, bird.y, 34, 1);
-      flameFx(bird.x + (Math.random() - 0.5) * 20, bird.y + (Math.random() - 0.5) * 20, 0.4, 0, 10, 3);
+      const here = birdFocus();
+      if ((emberAura % 6) === 0) crackPipesNear(here.x, here.y, 34, 1);
+      flameFx(here.x + (Math.random() - 0.5) * 16, here.y + (Math.random() - 0.5) * 12, 0.6, 0, 10, 3);
     }
     for (let i = fireballs.length - 1; i >= 0; i--) {
       const b = fireballs[i];
@@ -4328,7 +4341,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawPuPop() {
     if (!puPop) return;
     const t = puPop.life / 34, k = 1 - t;
-    ctx.save(); ctx.translate(bird.x, bird.y);
+    const here = birdFocus();
+    ctx.save(); ctx.translate(here.x, here.y);
     ctx.globalAlpha = 0.45 * t; ctx.fillStyle = "rgba(" + puPop.color + ",1)"; ctx.beginPath(); ctx.arc(0, 0, bird.r + 6 + k * 16, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = t; ctx.strokeStyle = "rgba(" + puPop.color + ",1)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, bird.r + 10 + k * 26, 0, Math.PI * 2); ctx.stroke();
     ctx.translate(0, -bird.r - 14 - k * 10); const s = 0.6 + Math.min(1, k * 4) * 0.5; ctx.scale(s, s);
@@ -4347,12 +4361,14 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (!(u.pulled && puMagnetFrames > 0)) u.x -= pipeSpeed * ws;
       }
       u.bob += 0.08;
-      if (state === State.PLAY && puMagnetFrames > 0) {   // v1.19c: the running Magnet pulls pickups in too
-        const mx = bird.x - u.x, my = bird.y - u.y, md = Math.hypot(mx, my) || 1;
+      if (state === State.PLAY && puMagnetFrames > 0) {
+        const here = birdFocus();
+        const mx = here.x - u.x, my = here.y - u.y, md = Math.hypot(mx, my) || 1;
         if (md < MAG_PICK_R) { u.pipe = null; u.pulled = true; const sp = Math.min(md, 6 + (1 - md / MAG_PICK_R) * 6); u.x += mx / md * sp; u.y += my / md * sp; }
       }
       if (state === State.PLAY) {
-        const dx = bird.x - u.x, dy = bird.y - (u.y + Math.sin(u.bob) * 3);
+        const here = birdFocus();
+        const dx = here.x - u.x, dy = here.y - (u.y + Math.sin(u.bob) * 3);
         const rr = POWERUP_R + bird.r;
         if (dx * dx + dy * dy < rr * rr) {
           powerups.splice(i, 1);
@@ -4418,12 +4434,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       bird.vy = 0;
       const boost = window.SkyHopFlight ? window.SkyHopFlight.stepBoost(bird) : null;
       if (boost) bird.heading = boost.heading;
-      if (frame % (quality >= 2 ? 3 : 1) === 0 && particles.length < maxParticles() - 4) addParticle(bird.x - 24, bird.y, -6, 0, 16, 16, Math.random() < 0.5 ? "#ffb02e" : "#ff5a1a", 3);
+      const here = birdFocus();
+      if (frame % (quality >= 2 ? 3 : 1) === 0 && particles.length < maxParticles() - 4) addParticle(here.x - 18, here.y, -6, 0, 16, 16, Math.random() < 0.5 ? "#ffb02e" : "#ff5a1a", 3);
     } else if (puMode === "ship") {
       if (--shipFireCd <= 0) {
         let tp = null;
         for (const q of pipes) if (!q.smashed && !q.shipTarget && q.x > bird.x + 10 && q.x < bird.x + 300 && (!tp || q.x < tp.x)) tp = q;
-        if (tp) { tp.shipTarget = true; shipRockets.push({ x: bird.x + 26, y: bird.y + 14, pipe: tp }); sweep(900, 300, 0.12, "square", 0.03); shipFireCd = 16; }
+        if (tp) { tp.shipTarget = true; const here = birdFocus(); shipRockets.push({ x: here.x + 20, y: here.y, pipe: tp }); sweep(900, 300, 0.12, "square", 0.03); shipFireCd = 16; }
         else shipFireCd = 4;
       }
       for (let i = shipRockets.length - 1; i >= 0; i--) {
@@ -4439,7 +4456,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function powerHits(p) {
     if (!p.bits || p.smashed) return false;
     const r = bird.r * puVis;
-    return window.SkyHopObstacles.hitIndex(bird.x, bird.y, r, p.x, p.gapY, p.bits, frame) >= 0;
+    const here = birdFocus();
+    return window.SkyHopObstacles.hitIndex(here.x, here.y, r, p.x, p.gapY, p.bits, frame) >= 0;
   }
   /** Drawn behind the bird: rocket pack / spaceship. Bird-centred coordinates. */
   function drawPuModeBack() {
@@ -4515,7 +4533,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       else { h.pipe = null; h.x -= pipeSpeed * ws; }
       h.spin += 0.12;
       if (state === State.PLAY) {
-        const dx = bird.x - h.x, dy = bird.y - h.y, rr = BH_R + bird.r * 0.7;
+        const here = birdFocus();
+        const dx = here.x - h.x, dy = here.y - h.y, rr = BH_R + bird.r * 0.7;
         if (dx * dx + dy * dy < rr * rr) { blackholes.splice(i, 1); enterBlackHole(); return; }
       }
       if (h.x < -40) blackholes.splice(i, 1);
@@ -7970,7 +7989,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function birdCircle() {
-    return { x: bird.x, y: bird.y, r: bird.r - 2 };
+    const f = birdFocus();
+    return { x: f.x, y: f.y, r: bird.r - 2 };
   }
 
   function hitPipe(p) {
@@ -8152,7 +8172,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (playing && t.hazard) {
         const tw = t.trunkW || 16;
         const th = 70 * t.scale;
-        if (circleRect(bird.x, bird.y, bird.r - 2, t.x - tw / 2, PLAY_H - th, tw, th)) {
+        if (circleRect(birdFocus().x, birdFocus().y, bird.r - 2, t.x - tw / 2, PLAY_H - th, tw, th)) {
           gameOver();
           return;
         }
@@ -8184,8 +8204,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         a.y += Math.sin(a.bob) * 0.6;
       }
       if (playing && a.hazard) {
-        const dx = bird.x - a.x;
-        const dy = bird.y - a.y;
+        const here = birdFocus();
+        const dx = here.x - a.x;
+        const dy = here.y - a.y;
         if (dx * dx + dy * dy < (bird.r + a.r - 2) * (bird.r + a.r - 2)) {
           gameOver();
           return;
@@ -8209,7 +8230,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
           h.shootCD = Math.max(60, (110 - difficultyT(level) * 40) * (h.cd || 1));
         }
         // Body collision
-        if (!(h.stun > 0) && circleRect(bird.x, bird.y, bird.r - 2, h.x - 14 * (h.sc || 1), h.y - 18 * (h.sc || 1), 28 * (h.sc || 1), 36 * (h.sc || 1))) {
+        if (!(h.stun > 0) && circleRect(birdFocus().x, birdFocus().y, bird.r - 2, h.x - 14 * (h.sc || 1), h.y - 18 * (h.sc || 1), 28 * (h.sc || 1), 36 * (h.sc || 1))) {
           if (tryTalonSmash("hunter", i)) continue;
           gameOver();
           return;
@@ -8225,8 +8246,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       p.y += p.vy * k;
       p.life -= k;
       if (playing) {
-        const dx = bird.x - p.x;
-        const dy = bird.y - p.y;
+        const here = birdFocus();
+        const dx = here.x - p.x;
+        const dy = here.y - p.y;
         const rr = bird.r + p.r - 3;
         if (dx * dx + dy * dy < rr * rr) {
           if (tryTalonSmash("projectile", i)) continue;
@@ -8327,10 +8349,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       window.SkyHopFlight.stepFollow(bird, {
         down: followOn || keySteer !== 0,
         aimX: aimX,
-        fingerY: followOn ? followSY : birdScreenY + 46,
-        homeY: PLAY_H * 0.82,
-        bandTop: PLAY_H * 0.50,
-        bandBot: PLAY_H * 0.88,
+        fingerY: followOn ? followSY : birdScreenY,
+        restX: CAM_LANE,
+        restY: BIRD_REST_Y,
+        bandTop: BIRD_AHEAD_Y,
+        bandBot: BIRD_REST_Y,
         laneMin: CAM_LANE - (W * 0.5 - 22),
         laneMax: CAM_LANE + (W * 0.5 - 22)
       });
@@ -8339,7 +8362,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       window.SkyHopFlight.stepBird(bird, { north: 1, held: false, steer: 0 });
     }
     if (boosting && frame % (quality >= 2 ? 4 : 2) === 0 && particles.length < maxParticles() - 6) {
-      addParticle(bird.x - 18, bird.y, -7, 0, 12, 12, "#fff4d0", 2.4);
+      const here = birdFocus();
+      addParticle(here.x - 16, here.y, -7, 0, 12, 12, "#fff4d0", 2.4);
     }
     bird.rot = 0;
     if (debugAuto) {
@@ -13173,8 +13197,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
   function applyCourseCamera() {
     const s = courseScale();
-    ctx.translate(W * 0.5, PLAY_H * 0.82);
-    ctx.rotate(-Math.PI / 2 + cameraLean());
+    ctx.translate(W * 0.5, BIRD_REST_Y);
+    ctx.rotate(-Math.PI / 2);
     ctx.scale(s, s);
     ctx.translate(-bird.x, -CAM_LANE);
   }
@@ -13907,6 +13931,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         finally { ctx = prev; }
         return c.toDataURL("image/png");
       },
+      poseFire: function (kind) {
+        state = State.PLAY; pauseMode = 0; puMode = null; debugAuto = false; followOn = false;
+        pipes.length = 0; hunters.length = 0; projectiles.length = 0;
+        bird.y = CAM_LANE; bird.screenY = BIRD_AHEAD_Y; birdScreenY = BIRD_AHEAD_Y;
+        heldWeapon = null; laserLeft = 0; fireBeams.length = 0; fireballs.length = 0;
+        storeWeapon(kind || "torch");
+        weaponFiring = true; autoFireLeft = 8; beakPlume = 12;
+        if (kind === "laser") fireLaser();
+        for (let i = 0; i < 6; i++) { tickHeldFire(); updateFireWeapons(); }
+        freeze112 = true; render();
+        const here = birdFocus(); const mouth = beakPoint();
+        return { sy: +here.sy.toFixed(1), mouth: +mouth.sy.toFixed(1), kind: kind || "torch" };
+      },
       tipCloseup: function () {
         const c = document.createElement("canvas"); c.width = 520; c.height = 360;
         const g = c.getContext("2d");
@@ -13945,7 +13982,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         freeze112 = true;
         render();
         const beam = fireBeams[0];
-        return { n: fireBeams.length, u: beam ? +beam.u.toFixed(2) : 0, locked: !!(beam && beam.locked), pts: beam && beam.pts ? beam.pts.length : 0 };
+        const here = birdFocus();
+        const tip = beam && beam.tip ? worldToScreen(beam.tip.x, beam.tip.y) : null;
+        const mouth = beakPoint();
+        return { n: fireBeams.length, u: beam ? +beam.u.toFixed(2) : 0, locked: !!(beam && beam.locked), birdY: +here.sy.toFixed(1), mouthY: +mouth.sy.toFixed(1), tipY: tip ? +tip.y.toFixed(1) : null };
       },
       shotSizes: function () {
         const c = document.createElement("canvas"); c.width = 860; c.height = 380;
