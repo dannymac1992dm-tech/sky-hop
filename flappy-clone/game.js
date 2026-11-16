@@ -34,6 +34,8 @@
   const UNLOCKS_KEY = "skyhop_unlocks";
   const UNLOCK_PROGRESS_KEY = "skyhop_unlock_progress";
   const DAILY_KEY = "skyhop_daily";
+  const DAILY_BEST_KEY = "skyhop_daily_best";
+  const DAILY_GATES = 12;
   const CONTINUE_TOKENS_KEY = "skyhop_continue_tokens";
   const SAFE_START_DAY_KEY = "skyhop_safe_start_day";
   const SHARE_URL = "https://dannymac1992dm-tech.github.io/sky-hop/";
@@ -129,6 +131,10 @@
   let featuredUnlockId = null;
   let continueTokens = parseInt(lsGet(CONTINUE_TOKENS_KEY) || "0", 10) || 0;
   let shareBusy = false;
+  let dailyMode = false;
+  let dailyRoll = null;
+  let dailyBestShown = 0;
+  let levelCard = null;
   // v1.9 Play Games leaderboard state
   let lbPendingScore = 0;   // best score this session that Play Games didn't accept yet (player signed out)
   const lbSubmitLog = [];   // scores sent to submitScore (QA/debug only)
@@ -1314,7 +1320,27 @@
   }
 
   function shareMessage() {
-    return "I scored " + score + " in Sky Hop! Can you beat me?";
+    return "Beat my score! I scored " + score + " on Level " + formatLevel(level) + " in Sky Hop. " + PLAY_STORE_URL;
+  }
+  function loadDailyBest() {
+    try {
+      const o = JSON.parse(lsGet(DAILY_BEST_KEY) || "null");
+      if (o && o.date === todayKey()) return o.best | 0;
+    } catch (_) {}
+    return 0;
+  }
+  function noteDailyBest(n) {
+    const best = Math.max(loadDailyBest(), n | 0);
+    try { lsSet(DAILY_BEST_KEY, JSON.stringify({ date: todayKey(), best: best })); } catch (_) {}
+    dailyBestShown = best;
+    return best;
+  }
+  function makeRoll(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (Math.imul(a, 1664525) + 1013904223) >>> 0;
+      return a / 4294967296;
+    };
   }
 
   /** Screenshot of the game-over screen + a small footer, as a JPEG data URL (for the share sheet). */
@@ -1343,38 +1369,27 @@
   async function shareRun() {
     if (shareBusy) return;
     shareBusy = true;
-    const msg = shareMessage();
-    const url = PLAY_STORE_URL;
-    // v1.9 Android: screenshot + text through the system share sheet (FileProvider, no permissions).
+    const text = shareMessage();
     const n = nativeApi();
-    if (n && typeof n.shareImage === "function") {
-      try {
-        await n.shareImage({ base64: captureShareImage(), mimeType: "image/jpeg", text: msg + " " + url, title: "Share your score" });
-        shareBusy = false;
-        return;
-      } catch (_) { /* fall back to text share below */ }
-    }
     try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: "Sky Hop", text: msg, url: url });
-        shareBusy = false;
+      if (n && typeof n.shareText === "function") {
+        await n.shareText({ text: text, title: "Beat my score" });
         return;
       }
-    } catch (_) { /* user cancel ok */ }
-    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({ title: "Beat my score", text: text });
+        return;
+      }
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(msg + " " + url);
-        shopToast = 1.2;
-        shopToastText = "Copied share text!";
-        shareBusy = false;
-        return;
+        await navigator.clipboard.writeText(text);
+        shopToast = 1.4;
+        shopToastText = "Share text copied";
       }
-    } catch (_) {}
-    try {
-      const intent = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(msg + " " + url);
-      window.open(intent, "_blank", "noopener,noreferrer");
-    } catch (_) {}
-    shareBusy = false;
+    } catch (_) {
+      // Closing the sheet is not a reward and not a failure.
+    } finally {
+      shareBusy = false;
+    }
   }
 
   /** "Get it on Google Play" (itch.io build): opens the Play listing in a new tab. */
@@ -2605,13 +2620,14 @@
     level = levelFromScore(score);
     applyDifficulty();
     if (level > prev) {
+      if (!dailyMode && state === State.PLAY) levelCard = { level: prev, score: score, t: 0, daily: false };
       hitchNote("levelup");
       levelFlash = 1;
       levelFlashText = "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL);
       sfxLevel();
       unlockTrophy(level);
       checkEvolution();
-      missionProgress("level", level);
+      if (!dailyMode) missionProgress("level", level);
       checkNewUnlocks(false);
       const newCheckpoint = level % E.CHECKPOINT_EVERY === 0 && level > runCheckpoint;
       if (newCheckpoint) runCheckpoint = level;
@@ -2752,7 +2768,7 @@
       spawnParticles(bird.x, bird.y - 8, 6, "#9fe8ff");
       sfxNearMiss();
       haptic("near");
-      missionProgress("near", 1);
+      if (!dailyMode) missionProgress("near", 1);
     } else {
       cleanStreak++;
       if (cleanStreak > 0 && cleanStreak % 3 === 0) {
@@ -2770,10 +2786,10 @@
     comboCoinSincePass = false;
     updateScoreMult();
     pipesPassed++;
-    missionProgress("pipes", 1);
+    if (!dailyMode) missionProgress("pipes", 1);
     if (cleanStreak > runMaxStreak) {
       runMaxStreak = cleanStreak;
-      missionProgress("streak", runMaxStreak);
+      if (!dailyMode) missionProgress("streak", runMaxStreak);
     }
     // Base +1 always (level formula). Bonus points from clean streak (capped).
     let add = 1;
@@ -2781,7 +2797,7 @@
     if (scoreMult >= 2.5) add += 1;
     if (nearMiss) add += 0; // sparkle only — no streak bonus
     if (p.beatRole === "challenge" && nearMiss && E.hasMastery(save, "glance")) recoveryExtra = Math.max(recoveryExtra, 2);
-    if (p.beatRole === "reward" && !nearMiss && state === State.PLAY) {
+    if (!dailyMode && p.beatRole === "reward" && !nearMiss && state === State.PLAY) {
       const bonus = E.hasMastery(save, "keen") ? 8 : 3;
       const gained = E.addCoins(save, bonus);
       runCoins += gained;
@@ -2791,6 +2807,7 @@
     score += add;
     scorePop = 1.15;
     onScoreChanged(prevScore);
+    if (dailyMode && pipesPassed >= DAILY_GATES) completeDailyRun();
     sfxScore();
     haptic("score");
     if (safeStartActive && safeStartFrames > 0) {
@@ -6303,7 +6320,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     toasts.length = 0;
     celebrations.length = 0;
     overCards.length = 0;
-    if (!fromCheckpoint) {
+    const dailyStart = !!(opts && opts.daily);
+    if (!fromCheckpoint && !dailyStart) {
       // Fresh run from Level 1
       if (resumeRec) writeResume(null);
       runCoins = 0;
@@ -6314,6 +6332,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       bonusLevelBase = 1;
       save.stats.runs++;
       missionProgress("runs", 1);
+    }
+    if (dailyStart) {
+      runCoins = 0;
+      runCoinFrac = 0;
+      runCheckpoint = 0;
     }
     if (keepSafe) {
       safeStartActive = true;
@@ -6369,6 +6392,44 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     notifyAdsState();
   }
 
+  function leaveDaily() {
+    dailyMode = false;
+    dailyRoll = null;
+    levelCard = null;
+    state = State.START;
+    notifyAdsState();
+  }
+  function startDaily() {
+    const O = window.SkyHopObstacles;
+    dailyMode = true;
+    dailyBestShown = loadDailyBest();
+    dailyRoll = makeRoll(O && O.dailySeed ? O.dailySeed(todayKey()) : 1);
+    gateSerial = 0;
+    levelCard = null;
+    startPlay({ daily: true });
+  }
+  function completeDailyRun() {
+    if (levelCard && levelCard.daily) return;
+    dailyBestShown = noteDailyBest(score);
+    levelCard = { level: level, score: score, t: 0, daily: true };
+    softenMusic();
+    sfxLevel();
+  }
+  function finishDailyDeath() {
+    dailyBestShown = noteDailyBest(score);
+    levelCard = null;
+    state = State.OVER;
+    overTimer = 0;
+    flash = 1;
+    screenShake = 0.4;
+    shopToast = 0;
+    shopToastText = "";
+    softenMusic();
+    sfxHit();
+    haptic("crash");
+    almostLines = [];
+    notifyAdsState();
+  }
   function gameOver() {
     if (state !== State.PLAY) return;
     if (pauseMode) return;
@@ -6381,6 +6442,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   /** The part of game over that banks the run (also used by Quit to menu on the pause screen). */
   function finishRun() {
+    if (dailyMode) { finishDailyDeath(); return; }
     if (resumeQuit) resumeQuit = false;
     else writeResume(runCheckpoint > 0 ? Object.assign(snapshotRun("crash"), { level: runCheckpoint, runEvo: E.evoStageForLevel(runCheckpoint), runCoins: 0, pellet: 0, pop: 0, poof: 0, zap: 0, mag: 0, held: null, cont: false }) : null);
     state = State.OVER;
@@ -6882,6 +6944,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function flap() {
     if (pauseMode) return;
+    if (levelCard) return;
     ensureAudio();
     // While rewarded continue is showing / just closed, never treat taps as retry/flap
     if (ignoreInputFrames > 0) return;
@@ -6897,7 +6960,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (state === State.OVER) {
       // Stray tap during/after ad must NOT call startPlay (that resets score/pipes)
       if (continueBusy || rewardBusy) return;
-      if (overTimer > 18) { if (resumeRec) resumeRun(); else startPlay(); }
+      if (overTimer > 18) { if (dailyMode) startDaily(); else if (resumeRec) resumeRun(); else startPlay(); }
       return;
     }
     if (state === State.PLAY) {
@@ -7226,6 +7289,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       else if (hitBtn(pt, uiButtons.ngNo)) newGameConfirm = 0;
       return;
     }
+    if (levelCard) {
+      if (hitBtn(pt, uiButtons.share)) { shareRun(); return; }
+      if (levelCard.daily) leaveDaily();
+      else levelCard = null;
+      return;
+    }
+    if (state === State.START && hitBtn(pt, uiButtons.daily)) { startDaily(); return; }
     if (state === State.START && hitBtn(pt, uiButtons.resume)) { resumeRun(); return; }
     if (state === State.START && hitBtn(pt, uiButtons.newGame)) { newGameConfirm = 1; return; }
     if (state === State.START || state === State.OVER) {
@@ -7457,13 +7527,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   // —— Pipes ——
   function spawnPipe() {
     if (turnSafe > 0) return;
+    if (dailyMode && pipesPassed >= DAILY_GATES) return;
     hitchNote("spawn");
     const margin = gapMargin;
     const gap = pipeGap;
     const minY = margin + gap / 2;
     const maxY = PLAY_H - margin - gap / 2 - 20;
     const span = Math.max(8, maxY - minY);
-    const gapY = minY + Math.random() * span;
+    const roll = dailyMode && dailyRoll ? dailyRoll : Math.random;
+    const gapY = minY + roll() * span;
     const prev = pipes.length ? pipes[pipes.length - 1] : null;
     const np = {
       x: W + 10,
@@ -7488,7 +7560,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       np.amp = amp;
       np.rate = mv.rate;
       np.ph = mv.ph;
-      np.gapY0 = lo + amp + Math.random() * Math.max(0, room - amp * 2);
+      np.gapY0 = lo + amp + roll() * Math.max(0, room - amp * 2);
       if (mv.bAmp) { np.bAmp = mv.bAmp; np.bRate = mv.bRate; np.bPh = mv.bPh; }
       stepPipeMotion(np, 0);
     }
@@ -7502,15 +7574,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const leg = bossGate || !O.flightLeg ? null : O.flightLeg(gi);
     let gapAdd = preview ? preview.gapAdd : 0;
     if (leg && leg.dir === "turn") gapAdd += 30;
-    if (preview && E.hasMastery(save, "calm") && preview.role === "challenge" && preview.cue) gapAdd = 22;
+    if (!dailyMode && preview && E.hasMastery(save, "calm") && preview.role === "challenge" && preview.cue) gapAdd = 22;
     if (recoveryExtra > 0 && preview && preview.role === "recovery") { gapAdd += 14; recoveryExtra--; }
     if (gapAdd) np.gap += gapAdd;
     const built = O.layoutGate({
       level: level,
       serial: serial,
       gateIndex: bossGate ? null : gi,
-      calmEntry: !bossGate && E.hasMastery(save, "calm"),
-      ampScale: preview && preview.role === "challenge" && E.hasMastery(save, "anchor") ? 0.8 : 1,
+      calmEntry: !dailyMode && !bossGate && E.hasMastery(save, "calm"),
+      ampScale: !dailyMode && preview && preview.role === "challenge" && E.hasMastery(save, "anchor") ? 0.8 : 1,
       worldIndex: np.wi,
       boss: bossGate,
       playH: PLAY_H,
@@ -7537,6 +7609,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     np.w = Math.max(36, built.w);
     np.gateLeft = built.left;
     pipes.push(np);
+    if (dailyMode) return;
     bhPipesSince++;
     if (!maybeSpawnPowerup(np) && !maybeSpawnBlackHole(np)) spawnCoinsForPipe(np, prev);
   }
@@ -7849,6 +7922,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
     if (state === State.TROPHIES || state === State.SHOP || state === State.BIRDS || state === State.MISSIONS) return;
 
+    if (levelCard && state === State.PLAY) {
+      levelCard.t++;
+      if (!levelCard.daily && levelCard.t > 240 && !shareBusy) levelCard = null;
+      return;
+    }
     if (state === State.PLAY) tickSkills();
     const dashing = state === State.PLAY && skillActive("dash") > 0;
     ws = (dashing ? DASH_WORLD_MUL : 1) * (state === State.PLAY ? puModeWorldMul() : 1);
@@ -10614,6 +10692,19 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     // Cached text sprites: re-rasterized only when the text changes.
     if (hudScoreFor !== score) { hudScoreFor = score; hudScoreText = String(score); }
     drawScoreDigits(hudScoreText, W / 2, 48, 1 + scorePop * 0.45);
+    if (dailyMode && state === State.PLAY && !levelCard) {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "rgba(40,18,8,0.72)";
+      roundRect(W / 2 - 118, 102, 236, 22, 8);
+      ctx.fill();
+      ctx.fillStyle = "#ffe7b0";
+      ctx.font = "bold 12px " + FONT;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Daily  " + Math.min(DAILY_GATES, pipesPassed) + "/" + DAILY_GATES + "  ·  best " + dailyBestShown, W / 2, 113);
+      ctx.restore();
+    }
 
     if (hudLevelFor !== level) { hudLevelFor = level; hudLevelText = (isBossLevel(level) ? "BOSS · " : "") + "Level " + formatLevel(level) + " / " + formatLevel(MAX_LEVEL); }
     const ls = textSlot("level", hudLevelText, 15, true, isBossLevel(level) ? "#ff8a8a" : (level >= MAX_LEVEL ? "#ffe08a" : "rgba(255,255,255,0.92)"), "rgba(0,0,0,0.28)", 3);
@@ -11475,6 +11566,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     uiButtons.shop = null;
     uiButtons.continue = null;
     uiButtons.share = null;
+    uiButtons.daily = null;
     uiButtons.featured = null;
     uiButtons.safeStart = null;
     uiButtons.checkpoint = null;
@@ -11503,21 +11595,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillStyle = "rgba(255,255,220,0.85)";
     ctx.fillText(formatLevel(MAX_LEVEL) + " levels · ⚑ checkpoint every " + E.CHECKPOINT_EVERY + " levels", W / 2, 120);
 
-    // Daily challenge chip (existing streak system)
-    const daily = ensureDaily();
-    if (daily && daily.challenge) {
-      ctx.fillStyle = "rgba(0,30,60,0.55)";
-      roundRect(W / 2 - 150, 132, 300, 40, 10);
-      ctx.fill();
-      ctx.fillStyle = daily.completed ? "#7dffb0" : "#ffe08a";
-      ctx.font = "bold 13px " + FONT;
-      ctx.fillText("Daily: " + daily.challenge.label, W / 2, 149);
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.font = "11px " + FONT;
-      const streakBit = (daily.streak | 0) > 0 ? " · 🔥 " + daily.streak : "";
-      const tok = continueTokens > 0 ? " · 🎫 " + continueTokens : "";
-      ctx.fillText((daily.completed ? "Completed today" : "Play to complete") + streakBit + tok, W / 2, 165);
-    }
+    const todayBest = loadDailyBest();
+    uiButtons.daily = drawButton(W / 2 - 150, 128, 300, 40, "Daily challenge  ·  best " + todayBest, "rgba(120,64,20,0.96)", "#fff8e8", "bold 14px " + FONT, "rgba(255,220,160,0.7)");
 
     // v1.9: Weekly leaderboard (Android app) or "Get it on Google Play" (itch.io web build)
     if (leaderboardAvailable()) {
@@ -11553,6 +11632,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.textAlign = "right";
     ctx.font = "11px " + FONT;
     ctx.fillStyle = "rgba(255,255,255,0.75)";
+    const daily = ensureDaily();
     const mult = E.streakMultiplier(daily ? daily.streak : 0);
     ctx.fillText((mult > 1 ? "🔥 +" + Math.round((mult - 1) * 100) + "% rewards · " : "") + "details ›", W - 38, my + 18);
     missionRows(38, my + 44, W - 76, 24, true);
@@ -11622,8 +11702,80 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
 
+  function drawLevelCard() {
+    if (!levelCard || state !== State.PLAY) return;
+    uiButtons.share = null;
+    uiButtons.keepFly = null;
+    ctx.save();
+    ctx.fillStyle = "rgba(6,4,12,0.62)";
+    ctx.fillRect(0, 0, W, H);
+    const px = 36, py = 150, pw = W - 72, ph = levelCard.daily ? 250 : 220;
+    ctx.fillStyle = "#fbfdff";
+    roundRect(px, py, pw, ph, 16);
+    ctx.fill();
+    ctx.fillStyle = "#ffb020";
+    roundRect(px, py, pw, 8, 4);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#1a2a3a";
+    ctx.font = "bold 24px " + FONT;
+    ctx.fillText(levelCard.daily ? "Daily complete" : "Level " + formatLevel(levelCard.level) + " complete", W / 2, py + 48);
+    ctx.font = "bold 18px " + FONT;
+    ctx.fillText("Score " + levelCard.score, W / 2, py + 80);
+    if (levelCard.daily) {
+      ctx.font = "14px " + FONT;
+      ctx.fillStyle = "#8a5a10";
+      ctx.fillText("Today's best " + dailyBestShown, W / 2, py + 106);
+    }
+    ctx.font = "12px " + FONT;
+    ctx.fillStyle = "#5c7080";
+    ctx.fillText("Sharing gives no reward.", W / 2, py + (levelCard.daily ? 132 : 112));
+    uiButtons.share = drawButton(px + 18, py + ph - 96, pw - 36, 38, "Beat my score", "rgba(30,140,200,0.96)", "#fff", "bold 15px " + FONT);
+    uiButtons.keepFly = drawButton(px + 18, py + ph - 50, pw - 36, 34, levelCard.daily ? "Menu" : "Keep flying", "rgba(40,160,90,0.95)", "#fff", "bold 14px " + FONT);
+    ctx.restore();
+  }
+  function drawDailyOver() {
+    uiButtons.share = null;
+    uiButtons.continue = null;
+    uiButtons.checkpoint = null;
+    uiButtons.doubleCoins = null;
+    uiButtons.shop = null;
+    uiButtons.birds = null;
+    uiButtons.trophies = null;
+    uiButtons.leaderboard = null;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(0, 0, W, H);
+    const px = 34, py = 120, pw = W - 68, ph = 280;
+    ctx.fillStyle = "#fbfdff";
+    roundRect(px, py, pw, ph, 18);
+    ctx.fill();
+    ctx.fillStyle = "#ffb020";
+    roundRect(px, py, pw, 8, 4);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#1a2a3a";
+    ctx.font = "bold 26px " + FONT;
+    ctx.fillText("Game Over", W / 2, py + 46);
+    ctx.font = "bold 16px " + FONT;
+    ctx.fillText("Score " + score + "   ·   Level " + formatLevel(level), W / 2, py + 80);
+    ctx.font = "14px " + FONT;
+    ctx.fillStyle = "#8a5a10";
+    ctx.fillText("Today's best " + dailyBestShown, W / 2, py + 108);
+    ctx.font = "12px " + FONT;
+    ctx.fillStyle = "#5c7080";
+    ctx.fillText("Sharing gives no reward.", W / 2, py + 134);
+    if (overTimer > 18) {
+      uiButtons.share = drawButton(px + 18, py + 156, pw - 36, 40, "Beat my score", "rgba(30,140,200,0.96)", "#fff", "bold 16px " + FONT);
+      ctx.fillStyle = "#ff7a10";
+      ctx.font = "bold 13px " + FONT;
+      ctx.fillText("Tap to retry today's challenge", W / 2, py + 230);
+    }
+  }
   // —— Game over ——
   function drawOver() {
+    if (dailyMode) { drawDailyOver(); return; }
     uiButtons.leaderboard = null;
     uiButtons.playStore = null;
     overButtonsBottom = 0;
@@ -11822,13 +11974,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       y += 48;
     }
 
+    uiButtons.share = drawButton(bx, y, BW, 36, "Beat my score", "rgba(30,140,200,0.96)", "#fff", "bold 15px " + FONT, "rgba(255,255,255,0.55)");
+    y += 44;
+
     if (leaderboardAvailable()) {
-      // v1.9 Android: Share your score · Weekly leaderboard, then Shop · Birds · Trophies
       const RW = 348, g2 = 4;
       const x0 = (W - RW) / 2;
-      const bw2 = (RW - g2) / 2;
-      uiButtons.share = drawButton(x0, y, bw2, 34, "📤 Share score", "rgba(30,140,200,0.95)", "#fff", "bold 13px " + FONT, "rgba(255,255,255,0.45)");
-      uiButtons.leaderboard = drawButton(x0 + bw2 + g2, y, bw2, 34, "🏅 Leaderboard", "rgba(20,120,90,0.95)", "#fff", "bold 13px " + FONT, "rgba(255,255,255,0.45)");
+      uiButtons.leaderboard = drawButton(x0, y, RW, 34, "🏅 Leaderboard", "rgba(20,120,90,0.95)", "#fff", "bold 13px " + FONT, "rgba(255,255,255,0.45)");
       y += 40;
       const bw3 = (RW - g2 * 2) / 3;
       let x3 = x0;
@@ -11839,13 +11991,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       return;
     }
 
-    // Share · Shop · Birds · Trophies
-    const bw4 = 84, g4 = 4;
-    let x4 = (W - (bw4 * 4 + g4 * 3)) / 2;
-    uiButtons.share = drawButton(x4, y, bw4, 32, "📤 Share", "rgba(30,140,200,0.92)", "#fff", "bold 12px " + FONT); x4 += bw4 + g4;
+    const bw4 = 96, g4 = 6;
+    let x4 = (W - (bw4 * 3 + g4 * 2)) / 2;
     uiButtons.shop = drawButton(x4, y, bw4, 32, "⭐ Skills", "rgba(80,160,255,0.95)", "#062040", "bold 12px " + FONT); x4 += bw4 + g4;
     uiButtons.birds = drawButton(x4, y, bw4, 32, "🧬 Evolve", "rgba(255,140,190,0.95)", "#3a0620", "bold 12px " + FONT); x4 += bw4 + g4;
-    uiButtons.trophies = drawButton(x4, y, bw4, 32, "🏆 Trophies", "rgba(255,200,60,0.95)", "#4a3000", "bold 11px " + FONT);
+    uiButtons.trophies = drawButton(x4, y, bw4, 32, "🏆 Trophies", "rgba(255,200,60,0.95)", "#4a3000", "bold 12px " + FONT);
     overButtonsBottom = y + 32;
   }
 
@@ -12892,10 +13042,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         drawPowerupHud();
         drawPuModeHud();
         drawBigBanner();
+        drawLevelCard();
         drawToast();
       }
       if (state === State.OVER) {
         drawOver();
+        drawLevelCard();
         if (overCards.length && overTimer > 20 && overButtonsBottom > 0) {
           drawBannerCard(Math.min(overButtonsBottom + 12, H - 62), overCards);
         }
@@ -13156,6 +13308,38 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       setShopScroll: function (y) { shopScroll = y; clampShopScroll(); },
       clearHazardsForShot: function () { trees.length = 0; animals.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
       artReady: function () { return !!PHOENIX_ART.ready; },
+      shareTextNow: function () { return shareMessage(); },
+      openShare: function () { shareRun(); return shareMessage(); },
+      showOver: function (sc, lv) {
+        dailyMode = false; levelCard = null; state = State.OVER;
+        score = sc == null ? 24 : sc; level = lv == null ? 3 : lv; overTimer = 40;
+        render();
+        return shareMessage();
+      },
+      showDailyOver: function (sc) {
+        dailyMode = true; levelCard = null; state = State.OVER;
+        score = sc == null ? 11 : sc; level = 2; overTimer = 40; dailyBestShown = noteDailyBest(score);
+        render();
+        return shareMessage();
+      },
+      showLevelDone: function () {
+        dailyMode = false; state = State.PLAY;
+        levelCard = { level: 3, score: 18, t: 5, daily: false };
+        score = 18; level = 4;
+        render();
+      },
+      startDailyRun: function () {
+        startDaily();
+        freeze112 = true;
+        render();
+        return { best: dailyBestShown, gates: DAILY_GATES };
+      },
+      showDailyDone: function () {
+        dailyMode = true; state = State.PLAY;
+        score = 12; level = 3; dailyBestShown = noteDailyBest(12);
+        levelCard = { level: 3, score: 12, t: 5, daily: true };
+        render();
+      },
       beginBank: function () {
         flightLock = null;
         freeze112 = true;

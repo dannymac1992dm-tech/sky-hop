@@ -278,6 +278,18 @@
    * Every gate flies north. There is no side-scroll and no turn back to east.
    * ang -PI/2 points the nose up the screen, toward the realm landmark.
    */
+  /** Same date string always returns the same 32-bit seed. No account and no network. */
+  function dailySeed(dateKey) {
+    var s = "skyhop-daily-v1:" + String(dateKey || "");
+    var h = 2166136261;
+    var i;
+    for (i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
   function flightLeg(index) {
     index = Math.max(0, index | 0);
     return { index: index, step: index % 20, dir: "north", turn: null, cue: null, ang: -Math.PI / 2 };
@@ -462,6 +474,7 @@
     pickPattern: pickPattern,
     beatFor: beatFor,
     flightLeg: flightLeg,
+    dailySeed: dailySeed,
     BEAT_CUES: BEAT_CUES
   };
 })(typeof window !== "undefined" ? window : globalThis);

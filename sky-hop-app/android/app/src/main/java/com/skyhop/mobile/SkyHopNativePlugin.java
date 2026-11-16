@@ -246,6 +246,29 @@ public class SkyHopNativePlugin extends Plugin {
     // —— Share your score ——
 
     @PluginMethod
+    public void shareText(PluginCall call) {
+        String text = call.getString("text", "");
+        String title = call.getString("title", "Beat my score");
+        if (text == null || text.isEmpty()) {
+            call.reject("text is required");
+            return;
+        }
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_TEXT, text);
+            send.putExtra(Intent.EXTRA_SUBJECT, title);
+            getActivity().startActivity(Intent.createChooser(send, title));
+            JSObject r = new JSObject();
+            r.put("shared", true);
+            call.resolve(r);
+        } catch (Throwable e) {
+            Log.w(TAG, "shareText failed", e);
+            call.reject("Could not open the share sheet", e instanceof Exception ? (Exception) e : null);
+        }
+    }
+
+    @PluginMethod
     public void shareImage(PluginCall call) {
         String data = call.getString("base64");
         String mime = call.getString("mimeType", "image/jpeg");

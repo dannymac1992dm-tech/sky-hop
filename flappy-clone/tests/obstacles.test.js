@@ -203,6 +203,22 @@ for (let i = 0; i < 80; i++) {
   if (leg.dir !== "north" || leg.turn || leg.ang !== -Math.PI / 2) sideGate++;
 }
 check("no gate is side-scrolling or a turn", sideGate === 0, "side=" + sideGate);
+const dayA = O.dailySeed("2026-11-16");
+const dayA2 = O.dailySeed("2026-11-16");
+const dayB = O.dailySeed("2026-11-17");
+check("a date has one daily seed", dayA === dayA2 && dayA !== dayB && dayA === (dayA >>> 0), dayA + " " + dayB);
+function dailyCourse(seed) {
+  const roll = O.mulberry(seed);
+  const parts = [];
+  for (let i = 0; i < 12; i++) {
+    const gapY = 90 + roll() * 280;
+    const gate = O.layoutGate({ level: 1, serial: i, gateIndex: i, worldIndex: 0, playH: PLAY_H, gap: 168, gapMin: 168, gapY0: gapY, pAmp: 0, rng: O.mulberry((100003 + i * 9973 + 17) >>> 0) });
+    parts.push(gapY.toFixed(2) + ":" + gate.pattern + ":" + gate.bits.map(function (b) { return b.kind + "@" + Math.round(b.rel); }).join(","));
+  }
+  return parts.join("|");
+}
+check("one date builds one short run", dailyCourse(dayA) === dailyCourse(dayA2));
+check("the next day builds a different run", dailyCourse(dayA) !== dailyCourse(dayB));
 for (let i = 0; i < 120; i++) {
   const b = O.beatFor(i);
   const gate = O.layoutGate({ level: 12, serial: i, gateIndex: i, worldIndex: 0, playH: PLAY_H, gap: 140, gapMin: 140, gapY0: 260, pAmp: 0, rng: O.mulberry(i + 9) });
