@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Sky Hop</string>
-    <string name="title_activity_main">Sky Hop</string>
+    <string name="app_name">Phoenix Go</string>
+    <string name="title_activity_main">Phoenix Go</string>
     <string name="package_name">com.skyhop.mobile</string>
     <string name="custom_url_scheme">com.skyhop.mobile</string>
     <!--

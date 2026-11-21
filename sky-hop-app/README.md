@@ -1,10 +1,10 @@
-# Sky Hop — Capacitor Android app
+# Phoenix Go — Capacitor Android app
 
-Native Android wrapper for the **Sky Hop** web game using [Capacitor](https://capacitorjs.com/).
+Native Android wrapper for the **Phoenix Go** web game using [Capacitor](https://capacitorjs.com/).
 
 | | |
 |---|---|
-| **Display name** | Sky Hop |
+| **Display name** | Phoenix Go |
 | **Application ID / package** | `com.skyhop.mobile` |
 | **Game source of truth** | `/workspace/flappy-clone` (do not treat `www/` as editable source) |
 | **This project** | `/workspace/sky-hop-app` |
@@ -91,7 +91,7 @@ Release / Play Store: configure signing in Android Studio or `android/app/build.
 
 ```
 sky-hop-app/
-├── capacitor.config.json   # appId com.skyhop.mobile, appName Sky Hop, webDir www
+├── capacitor.config.json   # appId com.skyhop.mobile, appName Phoenix Go, webDir www
 ├── package.json
 ├── scripts/sync-web.js     # copies /workspace/flappy-clone → www/
 ├── www/                    # generated web assets (Capacitor webDir)
@@ -117,7 +117,7 @@ sky-hop-app/
 
 - **applicationId**: `com.skyhop.mobile`
 - **namespace / Java package**: `com.skyhop.mobile`
-- **app_name**: Sky Hop
+- **app_name**: Phoenix Go
 
 Do not rename to a personal-name package.
 

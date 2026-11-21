@@ -1,6 +1,6 @@
 {
   "appId": "com.skyhop.mobile",
-  "appName": "Sky Hop",
+  "appName": "Phoenix Go",
   "webDir": "www",
   "server": {
     "androidScheme": "https"

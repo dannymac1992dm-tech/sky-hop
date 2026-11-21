@@ -1321,7 +1321,7 @@
   }
 
   function shareMessage() {
-    return "Beat my score! I scored " + score + " on Level " + formatLevel(level) + " in Sky Hop. " + PLAY_STORE_URL;
+    return "Beat my score! I scored " + score + " on Level " + formatLevel(level) + " in Phoenix Go. " + PLAY_STORE_URL;
   }
   function loadDailyBest() {
     try {
@@ -1360,7 +1360,7 @@
     g.textBaseline = "middle";
     g.fillStyle = "#ffffff";
     g.font = "bold 38px " + FONT;
-    g.fillText("I scored " + score + " in Sky Hop!", sw / 2, sh + 40);
+    g.fillText("I scored " + score + " in Phoenix Go!", sw / 2, sh + 40);
     g.fillStyle = "#9fe8ff";
     g.font = "bold 24px " + FONT;
     g.fillText("Free on Google Play", sw / 2, sh + 82);
@@ -1434,7 +1434,7 @@
       playLinkEl.href = PLAY_STORE_URL;
       playLinkEl.target = "_blank";
       playLinkEl.rel = "noopener noreferrer";
-      playLinkEl.setAttribute("aria-label", "Get Sky Hop on Google Play (opens in a new tab)");
+      playLinkEl.setAttribute("aria-label", "Get Phoenix Go on Google Play (opens in a new tab)");
       playLinkEl.title = "Get it on Google Play";
       playLinkEl.style.cssText = "position:absolute;z-index:5;display:none;background:transparent;border-radius:12px;-webkit-tap-highlight-color:transparent;";
       wrap.appendChild(playLinkEl);
@@ -12546,14 +12546,23 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     drawCoinPill(8, 10, save.coins, "left", coinPop);
     drawStreakChip();
 
+    ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 50px " + FONT;
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(12,6,10,0.55)";
-    ctx.strokeText("Sky Hop", W / 2, 76);
-    ctx.fillText("Sky Hop", W / 2, 76);
+    ctx.font = "bold 42px " + FONT;
+    const titleGrad = ctx.createLinearGradient(W / 2 - 150, 36, W / 2 + 150, 86);
+    titleGrad.addColorStop(0, "#ffd36a");
+    titleGrad.addColorStop(0.42, "#ffe7a8");
+    titleGrad.addColorStop(1, "#c62828");
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = "#3a120c";
+    ctx.strokeText("Phoenix Go", W / 2, 76);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffb15a";
+    ctx.strokeText("Phoenix Go", W / 2, 76);
+    ctx.fillStyle = titleGrad;
+    ctx.fillText("Phoenix Go", W / 2, 76);
+    ctx.restore();
     ctx.font = "15px " + FONT;
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.fillText("Cross the high realms.", W / 2, 100);
@@ -14429,6 +14438,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       animalPlan: function () { return { feature: WORLD_FEATURE, every: WORLD_EVERY, bossFrom: 15 }; },
       artReady: function () { return !!PHOENIX_ART.ready; },
       shareTextNow: function () { return shareMessage(); },
+      shareCardNow: function () { return captureShareImage(); },
       openShare: function () { shareRun(); return shareMessage(); },
       showOver: function (sc, lv) {
         dailyMode = false; levelCard = null; state = State.OVER;

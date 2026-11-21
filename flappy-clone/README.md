@@ -1,4 +1,4 @@
-# Sky Hop
+# Phoenix Go
 
 A polished, addictive browser mini-game inspired by classic flap-and-dodge side-scrollers. Original art, name, and sound — no third-party assets or trademarks.
 
@@ -207,14 +207,14 @@ html = '''<!DOCTYPE html>
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\" />
   <meta name=\"apple-mobile-web-app-capable\" content=\"yes\" />
   <meta name=\"theme-color\" content=\"#6ec6ff\" />
-  <title>Sky Hop</title>
+  <title>Phoenix Go</title>
   <style>
 ''' + css + '''
   </style>
 </head>
 <body>
   <div id=\"game-wrap\">
-    <canvas id=\"game\" width=\"400\" height=\"600\" aria-label=\"Sky Hop game canvas\"></canvas>
+    <canvas id=\"game\" width=\"400\" height=\"600\" aria-label=\"Phoenix Go game canvas\"></canvas>
     <div id=\"hud-btns\">
       <button id=\"extras-btn\" type=\"button\" aria-label=\"Toggle extras\" title=\"Extras on/off\" aria-pressed=\"false\">✨</button>
       <button id=\"mute-btn\" type=\"button\" aria-label=\"Toggle sound\" title=\"Mute / unmute\">🔊</button>

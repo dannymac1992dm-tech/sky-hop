@@ -1377,7 +1377,7 @@
   }
 
   function shareMessage() {
-    return "I scored " + score + " in Sky Hop! Can you beat me?";
+    return "I scored " + score + " in Phoenix Go! Can you beat me?";
   }
 
   /** Screenshot of the game-over screen + a small footer, as a JPEG data URL (for the share sheet). */
@@ -1396,7 +1396,7 @@
     g.textBaseline = "middle";
     g.fillStyle = "#ffffff";
     g.font = "bold 38px " + FONT;
-    g.fillText("I scored " + score + " in Sky Hop!", sw / 2, sh + 40);
+    g.fillText("I scored " + score + " in Phoenix Go!", sw / 2, sh + 40);
     g.fillStyle = "#9fe8ff";
     g.font = "bold 24px " + FONT;
     g.fillText("Free on Google Play", sw / 2, sh + 82);
@@ -1419,7 +1419,7 @@
     }
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: "Sky Hop", text: msg, url: url });
+        await navigator.share({ title: "Phoenix Go", text: msg, url: url });
         shareBusy = false;
         return;
       }
@@ -1481,7 +1481,7 @@
       playLinkEl.href = PLAY_STORE_URL;
       playLinkEl.target = "_blank";
       playLinkEl.rel = "noopener noreferrer";
-      playLinkEl.setAttribute("aria-label", "Get Sky Hop on Google Play (opens in a new tab)");
+      playLinkEl.setAttribute("aria-label", "Get Phoenix Go on Google Play (opens in a new tab)");
       playLinkEl.title = "Get it on Google Play";
       playLinkEl.style.cssText = "position:absolute;z-index:5;display:none;background:transparent;border-radius:12px;-webkit-tap-highlight-color:transparent;";
       wrap.appendChild(playLinkEl);
@@ -8140,8 +8140,8 @@
     ctx.font = "bold 50px " + FONT;
     ctx.lineWidth = 5;
     ctx.strokeStyle = "rgba(0,40,80,0.25)";
-    ctx.strokeText("Sky Hop", W / 2, 76);
-    ctx.fillText("Sky Hop", W / 2, 76);
+    ctx.strokeText("Phoenix Go", W / 2, 76);
+    ctx.fillText("Phoenix Go", W / 2, 76);
     ctx.font = "15px " + FONT;
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.fillText("Flap through the clouds!", W / 2, 100);
