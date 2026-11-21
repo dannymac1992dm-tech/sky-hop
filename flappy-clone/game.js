@@ -3211,11 +3211,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function blastFx(x, y, r, fire) { if (fxThin()) return; if (blasts.length >= MAX_BLASTS) blasts.shift(); blasts.push({ x: x, y: y, life: 14, max: 14, r: r, c: 0, f: fire ? 1 : 0 }); }
   function sparkRing(x, y, n, spd) { n = fxK(n); for (let i = 0; i < n; i++) { if (fxThin()) continue; if (sparks.length >= MAX_SPARKS) sparks.shift(); const a = (i / n) * Math.PI * 2 + Math.random() * 0.4, sp = spd * (0.6 + Math.random() * 0.7); sparks.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.5, life: 26 + Math.random() * 12, max: 38, c: 0, w: 5.5 + Math.random() * 3, col: RB[(i * 5 + frame) % 36] }); } }
   /** v1.19: the hit / impact look of each helper. kind: "pellet" (rainbow stars), "rocket" (fire), "toy" (lightning + starburst) */
-  function wHit(kind, x, y, big) {
+  function wHit(kind, x, y, big, foe) {
     if (kind === "rocket") { fireBurst(x, y, big ? 12 : 7); sparkRing(x, y, big ? 6 : 3, 3); }
     else if (kind === "zap") { zapFx(x, y, big ? 3 : 2); blastFx(x, y, big ? 44 : 28); }
     else if (kind === "toy") smokeFx(x, y, big ? 5 : 3, 12);
-    else { rings.push({ x: x, y: y, r: 3, max: big ? 26 : 16, life: 1, color: "255,255,255" }); }   // pellets: a small white pop
+    else { rings.push({ x: x, y: y, r: 3, max: big ? 26 : 16, life: 1, color: "255,255,255", foe: !!foe }); }   // pellets: a small white pop
   }
   const sparks = [];       // cartoon stars { x, y, vx, vy, rot, vr, life, max, c, w }
   const puffs = [];        // soft smoke clouds { x, y, r, vr, vx, vy, life, max, c }
@@ -3227,21 +3227,22 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function burstSpawnOk(minLv) { return level >= (minLv || PU_NEW_MIN_LEVEL); }
   function burstAllowed() { return state === State.PLAY && level >= 1; }
   function resetBurst() { burstBanner = null; zaps.length = 0; zapQueue = 0; zapHold = 0; zapCd = 0; zapStrikes = 0; pelletFrames = 0; pelletCd = 0; popQueue = 0; popCd = 0; popHold = 0; popLaunched = 0; sparks.length = 0; blasts.length = 0; puffs.length = 0; bolts.length = 0; flames.length = 0; chunks.length = 0; pellets.length = 0; popRockets.length = 0; poofQueue = 0; poofCd = 0; poofHold = 0; poofShown = false; toys.length = 0; confetti.length = 0; fireballs.length = 0; fireArrows.length = 0; meteors.length = 0; emberAura = 0; }
-  function poofFx(x, y, big) {
+  function poofFx(x, y, big, foe) {
     // soft cartoon cloud puff (white / pastel), no flames
     const n = big ? 9 : 5;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.5, sp = (big ? 1.2 : 0.8) + Math.random() * 1.4;
-      addParticle(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 0.3, 20 + Math.random() * 10, 30, i % 3 === 0 ? "#ffd6f0" : (i % 3 === 1 ? "#d9f3ff" : "#ffffff"), (big ? 4 : 2.6) + Math.random() * 2);
+      const lift = 0.3;
+      addParticle(x, y, Math.cos(a) * sp + (foe ? lift : 0), Math.sin(a) * sp - (foe ? 0 : lift), 20 + Math.random() * 10, 30, i % 3 === 0 ? "#ffd6f0" : (i % 3 === 1 ? "#d9f3ff" : "#ffffff"), (big ? 4 : 2.6) + Math.random() * 2);
     }
-    rings.push({ x: x, y: y, r: 6, max: big ? 34 : 20, life: 1, color: "255,255,255" });
+    rings.push({ x: x, y: y, r: 6, max: big ? 34 : 20, life: 1, color: "255,255,255", foe: !!foe });
   }
   function stunHunter(h, frames, push) {
     h.stun = Math.max(h.stun | 0, frames);
     h.kb = Math.max(h.kb || 0, push);
     h.shootCD = Math.max(h.shootCD, frames + 40);
-    poofFx(h.x, h.y - 6, true);
-    floaters.push({ x: h.x, y: h.y - 34, text: "Bonk!", life: 40, color: "#fff2a8" });
+    poofFx(h.x, h.y - 6, true, true);
+    floaters.push({ x: h.x, y: h.y - 34, text: "Bonk!", life: 40, color: "#fff2a8", foe: true });
     beep(520, 0.06, "triangle", 0.03);
   }
   function starFx(x, y, n) {
@@ -3251,11 +3252,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       sparks.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4, life: 34 + Math.random() * 14, max: 48, c: i % 2, w: 6.5 + Math.random() * 3, col: RB[(i * 7 + frame) % 36] });
     }
   }
-  function smokeFx(x, y, n, spread) {
+  function smokeFx(x, y, n, spread, foe) {
     for (let i = 0; i < n; i++) {
       if (puffs.length >= 40) puffs.shift();
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.8, d = Math.random() * spread;
-      puffs.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, r: 5 + Math.random() * 4, vr: 0.9 + Math.random() * 0.5, vx: Math.cos(a) * 0.5 - 0.5, vy: Math.sin(a) * 0.4 - 0.35, life: 24 + Math.random() * 8, max: 32, c: i % SMOKE_COLS.length });
+      puffs.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, r: 5 + Math.random() * 4, vr: 0.9 + Math.random() * 0.5, vx: Math.cos(a) * 0.5 + (foe ? 0.55 : -0.5), vy: Math.sin(a) * 0.4 - (foe ? 0 : 0.35), life: 24 + Math.random() * 8, max: 32, c: i % SMOKE_COLS.length });
     }
   }
   // v1.17 war-machine skills: Toy Popper (pelletDmg/pipeDmg), Crumble Touch (hunterHpCut/pipeHpCut), Bonk Bounty (bounty), Rapid Rockets (rocketCut)
@@ -3276,9 +3277,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const k = hunters.indexOf(h); if (k < 0) return;
     hunters.splice(k, 1); bstat.defeated++;
     const x = h.x, y = h.y - 6;
-    smokeFx(x, y, 9, 16); poofFx(x, y, true); confettiBurst(x, y, 34); wHit(w || "pellet", x, y - 6, true);
-    rings.push({ x: x, y: y, r: 8, max: 56, life: 1, color: "255,214,240" }); rings.push({ x: x, y: y, r: 4, max: 38, life: 1, color: "190,240,255" });
-    floaters.push({ x: x, y: y - 28, text: talon ? "Talon Smash!" : "Poof!", life: 50, color: "#fff2a8" });
+    smokeFx(x, y, 9, 16, true); poofFx(x, y, true, true); confettiBurst(x, y, 34, true); wHit(w || "pellet", x, y - 6, true, true);
+    rings.push({ x: x, y: y, r: 8, max: 56, life: 1, color: "255,214,240", foe: true }); rings.push({ x: x, y: y, r: 4, max: 38, life: 1, color: "190,240,255", foe: true });
+    floaters.push({ x: x, y: y - 28, text: talon ? "Talon Smash!" : "Poof!", life: 50, color: "#fff2a8", foe: true });
     burstReward(3, x, y - 46);
     screenShake = Math.max(screenShake, 0.15);
     sweep(620, 260, 0.18, "triangle", 0.03); beep(940, 0.05, "sine", 0.02);
@@ -3288,7 +3289,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const w = wk || (pel ? "pellet" : "rocket");
     if (hunters.indexOf(h) < 0) return;
     if (pel && frame - (h.hitF === undefined ? -99 : h.hitF) < HUNTER_HIT_GAP) return;
-    h.hitF = frame; h.dmg = (h.dmg | 0) + dmg; wHit(w, h.x, h.y - 6, dmg > 1);
+    h.hitF = frame; h.dmg = (h.dmg | 0) + dmg; wHit(w, h.x, h.y - 6, dmg > 1, true);
     if (h.dmg >= hunterHp(h)) defeatHunter(h, false, w);
     else { stunHunter(h, stunF, push); }
   }
@@ -3691,12 +3692,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     else if (!zapShown && zapHold < ZAP_HOLD - 110) { zapStrike(null); zapQueue--; zapCd = ZAP_EVERY; zapShown = true; }   // nothing to zap yet: one demo arc so the pickup is never invisible
     else zapCd = 6;
   }
-  function confettiBurst(x, y, R) {
+  function confettiBurst(x, y, R, foe) {
     const n = Math.round(24 + R * 0.5);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, sp = 1.2 + Math.random() * (R / 11);
       if (confetti.length >= MAX_CONFETTI) confetti.shift();
-      confetti.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.4, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.5, life: 44 + Math.random() * 26, max: 70, c: (i + (frame >> 2)) % CONFETTI_COLS.length, w: 3.4 + Math.random() * 3 });
+      confetti.push({ x: x, y: y, vx: Math.cos(a) * sp + (foe ? 1.1 : 0), vy: Math.sin(a) * sp - (foe ? 0 : 1.4), rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.5, life: 44 + Math.random() * 26, max: 70, c: (i + (frame >> 2)) % CONFETTI_COLS.length, w: 3.4 + Math.random() * 3 });
     }
   }
   function poofToyGo(x, y) {
@@ -3849,6 +3850,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       x: W * 0.5 + (wy - CAM_LANE),
       y: BIRD_REST_Y - (wx - bird.x)
     };
+  }
+  /** World point of a hunter or shot, including the same scroll fraction the course uses. */
+  function foeScreen(wx, wy) {
+    const shiftX = state === State.PLAY ? pipeSpeed * ws * renderAlpha : 0;
+    return worldToScreen(wx - shiftX, wy);
   }
   function grantFriends() {
     const n = 1 + (Math.random() < 0.55 ? 1 : 0);
@@ -8429,7 +8435,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function updateFx() {
     for (let i = floaters.length - 1; i >= 0; i--) {
       const f = floaters[i];
-      f.y -= f.big ? 0.25 : 0.7;
+      if (f.foe) f.x += f.big ? 0.25 : 0.7;
+      else f.y -= f.big ? 0.25 : 0.7;
       f.age = (f.age | 0) + 1;
       f.life--;
       if (f.life <= 0) floaters.splice(i, 1);
@@ -8721,11 +8728,17 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function drawHunter(h) {
     const T = HUNTER_TIERS[h.tier | 0] || HUNTER_TIERS[0], V = HUNTER_VARS[h.v | 0] || HUNTER_VARS[0], s = h.sc || T.sc;
     const bx = V.bx, by = V.by, bodyTop = 6 - 16 * by, headY = bodyTop - 2, headR = 8 * V.head, hatBase = headY - 5, hatH = T.hatH * V.hatS, brim = T.brim * V.brimS;
+    const scr = foeScreen(h.x, h.y);
     ctx.save();
-    ctx.translate(h.x, h.y);
+    ctx.translate(scr.x, scr.y);
     if (h.stun > 0) ctx.rotate(Math.sin(h.stun * 0.35) * 0.1);
+    ctx.save();
     ctx.scale(s, s);
-    if (T.broom || V.broom !== "straight") {   // broom under the hunter: a different broom per shape
+    if (T.broom || V.broom !== "straight") {   // upright rider; bristles hang down the screen, toward the bird
+      ctx.save();
+      ctx.translate(0, 18);
+      ctx.rotate(-Math.PI / 2);
+      ctx.translate(0, -18);
       ctx.lineCap = "round"; ctx.strokeStyle = "#8a5a2b"; ctx.lineWidth = 3;
       if (V.broom === "stub") {
         ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(-14, 22); ctx.lineTo(24, 18); ctx.stroke();
@@ -8742,6 +8755,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         ctx.fillStyle = "#e0b050"; ctx.beginPath(); ctx.moveTo(-22, 24); ctx.lineTo(-40, 15); ctx.lineTo(-38, 25); ctx.lineTo(-40, 34); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = "#b8872d"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-30, 21); ctx.lineTo(-38, 25); ctx.moveTo(-30, 27); ctx.lineTo(-38, 25); ctx.stroke();
       }
+      ctx.restore();
     }
     // hunched shapes lean the whole upper body forward
     ctx.save();
@@ -8769,36 +8783,42 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.beginPath(); ctx.arc(-3, headY - 1, 1.8, 0, Math.PI * 2); ctx.arc(3, headY - 1, 1.8, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     ctx.restore();
-    // arm + net / stick
+    // arm + net / stick, aimed down the screen at the bird
     ctx.strokeStyle = "#1a1008"; ctx.lineWidth = 3; ctx.lineCap = "butt";
-    ctx.beginPath(); ctx.moveTo(8 * bx, 0); ctx.lineTo(22, 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8 * bx, 2); ctx.lineTo(12, 22); ctx.stroke();
     if (h.kind === "net") {
       ctx.strokeStyle = h.tier ? T.band || "#4a3020" : "#4a3020"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(22 + 4 * T.net, 8, 8 * T.net, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(12, 24 + 6 * T.net, 8 * T.net, 0, Math.PI * 2); ctx.stroke();
     } else {
-      ctx.fillStyle = "#3a2818"; ctx.fillRect(20, 3, 14 + 4 * (T.net - 1) * 3, 4);
+      ctx.save();
+      ctx.translate(12, 20);
+      ctx.rotate(Math.PI / 2);
+      ctx.fillStyle = "#3a2818"; ctx.fillRect(0, -2, 14 + 4 * (T.net - 1) * 3, 4);
+      ctx.restore();
     }
     ctx.restore();
     // HP pips above the hat: one per hit left (they pop away when the hunter is bonked)
     const n = hunterHp(h), left = Math.max(0, n - (h.dmg | 0)), py = (Math.min(sy, hatBase - 8) - 10) * s;
     for (let i = 0; i < n; i++) {
-      const px = h.x + (i - (n - 1) / 2) * 8;
+      const px = (i - (n - 1) / 2) * 8;
       ctx.fillStyle = i < left ? "#ffd24a" : "rgba(255,255,255,0.28)"; ctx.strokeStyle = "rgba(60,30,20,0.8)"; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(px, h.y + py, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
     if (h.stun > 0) {
       // dazed: little stars circle over the head
       for (let i = 0; i < 3; i++) {
-        const a = frame * 0.14 + i * 2.094, qx = h.x + Math.cos(a) * 11 * s, qy = h.y + (hatBase - hatH * 0.4) * s + Math.sin(a) * 3.5;
+        const a = frame * 0.14 + i * 2.094, qx = Math.cos(a) * 11 * s, qy = (hatBase - hatH * 0.4) * s + Math.sin(a) * 3.5;
         ctx.fillStyle = "#ffe066"; ctx.beginPath(); ctx.arc(qx, qy, 2.6, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(qx - 0.7, qy - 0.7, 0.9, 0, Math.PI * 2); ctx.fill();
       }
     }
+    ctx.restore();
   }
 
   function drawProjectile(p) {
+    const s = foeScreen(p.x, p.y);
     ctx.save();
-    ctx.translate(p.x, p.y);
+    ctx.translate(s.x, s.y);
     if (p.kind === "net") {
       ctx.strokeStyle = "rgba(80,50,20,0.85)";
       ctx.lineWidth = 1.5;
@@ -8816,11 +8836,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     } else {
       ctx.fillStyle = "#ff6633";
       ctx.beginPath();
-      ctx.ellipse(0, 0, p.r + 2, p.r * 0.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, p.r * 0.6, p.r + 2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#ffcc66";
       ctx.beginPath();
-      ctx.arc(-2, 0, 2, 0, Math.PI * 2);
+      ctx.arc(0, (p.r + 2) * 0.45, 2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -11434,6 +11454,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillRect(0, 0, W, H);
   }
 
+  function drawForwardFoes() {
+    for (let i = 0; i < hunters.length; i++) drawHunter(hunters[i]);
+    for (let i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
+  }
+
   function drawWorldExtras(layer) {
     // layer: "bg" before pipes, "fg" after pipes
     const showLand = false;
@@ -11447,8 +11472,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (t.layer === "fg") drawTree(t);
       }
       for (const a of animals) drawAnimal(a);
-      for (const h of hunters) drawHunter(h);
-      for (const p of projectiles) drawProjectile(p);
     }
   }
 
@@ -11658,13 +11681,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function drawFx() {
     for (const r of rings) {
+      const at = r.foe ? foeScreen(r.x, r.y) : r;
       ctx.strokeStyle = "rgba(" + r.color + "," + Math.max(0, r.life).toFixed(3) + ")";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(r.x, r.y, Math.max(0.1, r.r), 0, Math.PI * 2);
+      ctx.arc(at.x, at.y, Math.max(0.1, r.r), 0, Math.PI * 2);
       ctx.stroke();
     }
     for (const f of floaters) {
+      const at = f.foe ? foeScreen(f.x, f.y) : f;
       ctx.save();
       ctx.globalAlpha = Math.min(1, f.life / 20);
       ctx.font = "bold " + (f.px || (f.big ? 16 : 13)) + "px " + FONT;
@@ -11675,15 +11700,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (f.pop) {
         // v1.12: combo text pops in (scale overshoot) then settles
         const k = 1 + Math.max(0, 1 - (f.age | 0) / 9) * 0.7;
-        ctx.translate(f.x, f.y);
+        ctx.translate(at.x, at.y);
         ctx.scale(k, k);
         ctx.strokeText(f.text, 0, 0);
         ctx.fillStyle = f.color || "#fff";
         ctx.fillText(f.text, 0, 0);
       } else {
-        ctx.strokeText(f.text, f.x, f.y);
+        ctx.strokeText(f.text, at.x, at.y);
         ctx.fillStyle = f.color || "#fff";
-        ctx.fillText(f.text, f.x, f.y);
+        ctx.fillText(f.text, at.x, at.y);
       }
       ctx.restore();
     }
@@ -13560,6 +13585,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     drawParticles();
     ctx.restore();
     ctx.restore();
+    drawForwardFoes();
     drawBirdHeading();
     drawNearClouds();
     bird.y = by;
@@ -13689,11 +13715,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       setPerk: function (id, lv) { if (!save.birdPerks) save.birdPerks = {}; save.birdPerks[id] = lv | 0; if (save.species.indexOf(id) < 0) save.species.push(id); persist(); },
       equipSpecies: function (id) { save.speciesEquipped = id; if (save.species.indexOf(id) < 0) save.species.push(id); persist(); },
       resetRunPerks: resetRunPerks,
-      spawnHunterAt: function (x, y, tier, vr) { const h = { x: x, y: y, bob: 0, shootCD: 9999, kind: "net" }; hunters.push(h); hunterTierInit(h, level, tier === undefined ? 0 : tier, vr); },
+      spawnHunterAt: function (x, y, tier, vr, kind) { const h = { x: x, y: y, bob: 0, shootCD: 9999, kind: kind || "net" }; hunters.push(h); hunterTierInit(h, level, tier === undefined ? 0 : tier, vr); },
       hunterVariants: function () { return HUNTER_VARS.map(function (v) { return { id: v.id, w: v.w, sc: v.sc, spd: v.spd, bx: v.bx, by: v.by, hat: v.hat, broom: v.broom }; }); },
       hunterRollVariants: function (n) { const o = {}; for (let i = 0; i < n; i++) { const k = HUNTER_VARS[hunterRollVariant()].id; o[k] = (o[k] || 0) + 1; } return o; },
       hunterTierFor: hunterTierFor, hunterTiers: function () { return HUNTER_TIERS.map(function (t) { return { name: t.name, from: t.from, hp: t.hp, spd: t.spd, net: t.net }; }); },
-      fireAt: function (x, y) { projectiles.push({ x: x, y: y, vx: 0, vy: 0, kind: "net", r: 14, life: 200 }); },
+      fireAt: function (x, y, kind) { projectiles.push({ x: x, y: y, vx: 0, vy: 0, kind: kind || "net", r: kind === "bolt" ? 7 : 14, life: 200 }); },
       pickCoin: function (c) { collectCoin(c || { value: 1, x: bird.x, y: bird.y, risky: false }); },
       skillDur: function (id) { return skillStatsFor(id).dur; },
       dashFrames: function () { return skillState.dash ? skillState.dash.activeMax : 0; },
@@ -13788,7 +13814,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         pelletFrames = 0; popQueue = 0; poofQueue = 0; zapQueue = 0; puMagnetFrames = 0; puMode = null;
         applyDifficulty();
         worldIdx = -1; syncWorld(false);
-        milestoneFlash = 0; bigBannerT = 0; levelFlash = 0; evoMoment = null;
+        milestoneFlash = 0; bigBannerT = 0; levelFlash = 0; evoMoment = null; trophyFlash = 0; trophyFlashText = "";
         for (let i = 0; i < 3; i++) { spawnPipe(); pipes[pipes.length - 1].x = 130 + i * 145; }
         blackholes.length = 0; powerups.length = 0;
         const p = pipes[0];
