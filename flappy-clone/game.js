@@ -2163,6 +2163,7 @@
   const trees = [];       // bg/fg scenery + trunk obstacles
   const animals = [];     // world animals: bats, ravens, wasps, storm eagles
   const feathers = [];    // defeat puff: feathers drift up the screen, no gore
+  const dragonShots = []; // dragon and sentinel fire, traveling down the screen
   const hunters = [];     // hostile bird hunters
   const projectiles = []; // nets / shots from hunters
   const waterfalls = [];  // scenic + optional mild push
@@ -6589,6 +6590,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     trees.length = 0;
     animals.length = 0;
     feathers.length = 0;
+    dragonShots.length = 0;
     hunters.length = 0;
     projectiles.length = 0;
     waterfalls.length = 0;
@@ -6935,6 +6937,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     for (let i = 0; i < snap.hunters.length; i++) hunters.push(Object.assign({}, snap.hunters[i]));
     animals.length = 0;
     feathers.length = 0;
+    dragonShots.length = 0;
     for (let i = 0; i < snap.animals.length; i++) animals.push(Object.assign({}, snap.animals[i]));
     projectiles.length = 0;
     for (let i = 0; i < snap.projectiles.length; i++) projectiles.push(Object.assign({}, snap.projectiles[i]));
@@ -8065,31 +8068,59 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     });
   }
 
-  // One animal family per world, on the same spawn clock the old critters used.
-  // Eagles are rare and only in the sky worlds, so they replace a regular spawn instead of adding one.
-  const ANIMAL_BY_WORLD = {
-    day: "bat", desert: "wasp", snow: "raven", city: "bat", space: "bat",
-    blossom: "wasp", reef: "raven", volcano: "bat", candy: "raven"
+  // Each world features one new silhouette. Witches are a minority of the mix, not the roster.
+  const WORLD_FEATURE = {
+    day: "bat", desert: "raven", snow: "frost", city: "wraith", space: "eye",
+    blossom: "vulture", reef: "eel", volcano: "imp", candy: "gargoyle"
   };
-  const EAGLE_WORLDS = { snow: 1, space: 1, candy: 1 };
-  function animalKindForWorld() {
+  const FOE_STAT = {
+    bat: { r: 7, hp: 1, spd: 1.02 }, raven: { r: 11, hp: 1, spd: 0.78 },
+    wasp: { r: 5, hp: 1, spd: 0.4 }, eagle: { r: 18, hp: 4, spd: 0.48 },
+    drake: { r: 14, hp: 3, spd: 0.55 }, dragon: { r: 22, hp: 7, spd: 0.4 },
+    gargoyle: { r: 13, hp: 2, spd: 0.72 }, wraith: { r: 12, hp: 2, spd: 0.34 },
+    frost: { r: 12, hp: 2, spd: 0.34 }, eel: { r: 10, hp: 3, spd: 0.62 },
+    vulture: { r: 12, hp: 2, spd: 0.86 }, imp: { r: 6, hp: 1, spd: 0.95 },
+    eye: { r: 11, hp: 2, spd: 0.3 }
+  };
+  let dragonBossLevel = 0;
+  function foeAlive(kind) {
+    for (let i = 0; i < animals.length; i++) if (animals[i].kind === kind && !animals[i].dispersing) return true;
+    return false;
+  }
+  function pickSpawnKind() {
     const id = worldDefAt(worldIndexFor(level)).id;
-    const eagleUp = EAGLE_WORLDS[id] && level >= 11 && !animals.some(function (a) { return a.kind === "eagle" && !a.dispersing; });
-    if (eagleUp && Math.random() < 0.12) return "eagle";
-    if (id === "blossom" && Math.random() < 0.45) return "raven";
-    return ANIMAL_BY_WORLD[id] || "bat";
+    const feature = WORLD_FEATURE[id] || "bat";
+    const worldEnd = (level % WORLD_EVERY) === 0;
+    if (level >= 15 && worldEnd && dragonBossLevel !== level && !foeAlive("dragon")) return "dragon";
+    if (level === 10 && !foeAlive("drake")) return "drake";
+    if (level < 11) {
+      if (level >= 6 && hunters.length === 0 && Math.random() < 0.1) return "hunter";
+      return Math.random() < 0.5 ? "bat" : "raven";
+    }
+    if (level < 31) {
+      if (hunters.length === 0 && Math.random() < 0.12) return "hunter";
+      if (level >= 18 && !foeAlive("eagle") && (id === "snow" || id === "space" || id === "candy") && Math.random() < 0.08) return "eagle";
+      if (!foeAlive("drake") && Math.random() < 0.16) return "drake";
+      const mid = [feature, "wasp", "raven", "bat", feature];
+      return mid[Math.floor(Math.random() * mid.length)];
+    }
+    if (hunters.length < 1 && Math.random() < 0.1) return "hunter";
+    if (!foeAlive("eagle") && Math.random() < 0.1) return "eagle";
+    if (!foeAlive("drake") && Math.random() < 0.12) return "drake";
+    const late = [feature, "vulture", "eel", "eye", "gargoyle", "wraith", "wasp"];
+    if (id === "day" || id === "volcano") late.push("imp");
+    if (id === "snow") late.push("frost");
+    return late[Math.floor(Math.random() * late.length)];
   }
   function pushAnimal(kind, x, y, extra) {
+    const st = FOE_STAT[kind] || FOE_STAT.bat;
     const a = {
       x: x, y: y, kind: kind, flying: true, hazard: true,
       phase: Math.random() * 6.28, bob: Math.random() * 6.28,
-      dispersing: 0, fade: 1, dmg: 0, hp: 1, r: 8,
-      vx: -(pipeSpeed * 0.7), vy: 0, zig: Math.random() < 0.5 ? 1 : -1, gid: 0
+      dispersing: 0, fade: 1, dmg: 0, hp: st.hp, r: st.r,
+      vx: -(pipeSpeed * st.spd), vy: 0, zig: Math.random() < 0.5 ? 1 : -1,
+      gid: 0, wind: 0, glow: 0, recoil: 0, dive: 0, veil: 1, trail: []
     };
-    if (kind === "bat") { a.r = 7; a.vx = -(pipeSpeed * 1.02); }
-    else if (kind === "raven") { a.r = 11; a.vx = -(pipeSpeed * 0.78); a.hp = 1; }
-    else if (kind === "wasp") { a.r = 5; a.vx = -(pipeSpeed * 0.4); }
-    else if (kind === "eagle") { a.r = 18; a.vx = -(pipeSpeed * 0.48); a.hp = 4; }
     if (extra) Object.assign(a, extra);
     animals.push(a);
     return a;
@@ -8122,20 +8153,43 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function defeatAnimal(a) {
     const i = animals.indexOf(a);
     if (i < 0) return;
-    animals.splice(i, 1);
-    const col = a.kind === "raven" ? "#3a3a40" : (a.kind === "eagle" ? "#efe6d4" : "#c4b4a0");
-    featherBurst(a.x, a.y, a.kind === "eagle" ? 12 : 6, col);
-    if (a.kind === "eagle") {
+    const ember = a.kind === "dragon" || a.kind === "drake" || a.kind === "imp";
+    const stone = a.kind === "gargoyle";
+    const col = stone ? "#9aa0aa" : (ember ? "#ff7a2a" : (a.kind === "raven" || a.kind === "vulture" ? "#2a2c32" : "#c4b4a0"));
+    featherBurst(a.x, a.y, a.kind === "dragon" || a.kind === "eagle" ? 14 : 6, col);
+    if (a.kind === "eagle" || a.kind === "dragon") {
       for (let k = 0; k < 3; k++) coins.push({ x: a.x - 8, y: a.y + (k - 1) * 14, value: 1, risky: false, spin: 0, pulled: false, pipe: null, dx: 0, gy: 0 });
     }
+    if (a.kind === "dragon" || a.kind === "drake" || a.kind === "gargoyle" || a.kind === "eagle") {
+      a.dispersing = 1; a.hazard = false; a.vx = 1.15; a.vy = (Math.random() - 0.5) * 0.4; a.fade = 1;
+      return;
+    }
+    animals.splice(i, 1);
   }
   function hurtAnimal(a, dmg) {
     if (!a || a.dispersing) return false;
     if (a.kind === "wasp") { disperseGroup(a.gid, a.x, a.y); return true; }
+    a.recoil = 10;
     a.dmg = (a.dmg | 0) + (dmg || 1);
     if (a.dmg >= (a.hp || 1)) defeatAnimal(a);
     else smokeFx(a.x, a.y, 3, 8, true);
     return true;
+  }
+  function breatheAt(a) {
+    if (a.x < bird.x + 90 || dragonShots.length >= 5) return;
+    const n = a.kind === "dragon" ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const spread = (i - (n - 1) / 2) * (a.kind === "eye" ? 0 : 22);
+      const aim = bird.y - (a.y + spread);
+      dragonShots.push({
+        x: a.x - 16, y: a.y + spread,
+        vx: a.kind === "eye" ? -2.4 : (a.kind === "dragon" ? -2.0 : -1.65),
+        vy: a.kind === "eye" ? 0 : Math.max(-0.26, Math.min(0.26, aim * 0.0035)),
+        r: a.kind === "eye" ? 5 : (a.kind === "dragon" ? 9 : 7),
+        life: 140,
+        beam: a.kind === "eye"
+      });
+    }
   }
   function animalHit(x, y, rad, dmg) {
     let hit = false;
@@ -8149,31 +8203,34 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
   function spawnAnimal() {
     if (!extrasOn) return "";
-    const kind = animalKindForWorld();
-    let y0 = 64 + Math.random() * (PLAY_H - 150);
+    if (foeAlive("dragon")) return "hold";
+    const kind = pickSpawnKind();
+    if (kind === "hunter") { spawnHunter(); return "hunter"; }
+    let y0 = 70 + Math.random() * (PLAY_H - 160);
     if (nearPipeGap(W + 36, y0, 30)) y0 = Math.max(48, Math.min(PLAY_H - 70, y0 + (y0 < PLAY_H / 2 ? 54 : -54)));
     const gid = frame + Math.random();
-    if (kind === "bat") {
-      const n = level < 10 ? 2 : 3;
+    if (kind === "bat" || kind === "imp") {
+      const n = level < 11 ? 2 : (level < 31 ? 2 : 3);
       for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
-        pushAnimal("bat", W + 22 + i * 14, y0 + (i - (n - 1) / 2) * 24, { gid: gid, zig: i % 2 ? 1 : -1, phase: i * 1.4 });
+        pushAnimal(kind, W + 24 + i * 16, y0 + (i - (n - 1) / 2) * 26, { gid: gid, zig: i % 2 ? 1 : -1, phase: i * 1.3 });
       }
     } else if (kind === "wasp") {
-      const n = level < 10 ? 3 : 4;
+      const n = level < 31 ? 3 : 4;
       for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
         const ang = (i / n) * Math.PI * 2;
-        pushAnimal("wasp", W + 28 + Math.cos(ang) * 12, y0 + Math.sin(ang) * 14, { gid: gid, phase: ang });
+        pushAnimal("wasp", W + 30 + Math.cos(ang) * 14, y0 + Math.sin(ang) * 16, { gid: gid, phase: ang });
       }
-    } else if (kind === "eagle") {
-      if (animals.length < MAX_ANIMALS) pushAnimal("eagle", W + 46, y0, { gid: gid });
     } else if (animals.length < MAX_ANIMALS) {
-      pushAnimal("raven", W + 30, y0, { gid: gid });
+      const ahead = kind === "dragon" ? 280 : (kind === "drake" ? 200 : 36);
+      pushAnimal(kind, bird.x + ahead, y0, { gid: gid, boss: kind === "dragon" ? 1 : 0 });
+      if (kind === "dragon") dragonBossLevel = level;
     }
     return kind;
   }
 
   function spawnHunter() {
-    if (!extrasOn || level < 35 || isBossLevel(level) || isBossLevel(level + 1)) return;   // v1.18: hunters never spawn on / right before a boss level
+    if (!extrasOn || level < 6 || isBossLevel(level) || isBossLevel(level + 1)) return;   // witches stay rare; never on a boss level
+    if (hunters.length >= (level < 31 ? 1 : 2)) return;
     // Ramp frequency with level
     let y = 50 + Math.random() * (PLAY_H - 120);
     if (nearPipeGap(W + 40, y, 36)) {
@@ -8238,16 +8295,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (nextAnimal <= 0 && level >= 2) {
           let spawned = "";
           if (animals.length < MAX_ANIMALS) spawned = spawnAnimal();
-          // Longer gap than the old critter clock so groups and chasers do not stack on the hunters.
-          const base = level < 8 ? 240 : Math.max(130, 220 - tD * 60);
-          nextAnimal = base + (spawned === "eagle" ? 200 : spawned === "bat" ? 30 : 0);
-        }
-        nextHunter -= k;
-        if (nextHunter <= 0 && level >= 35) {
-          if (hunters.length < MAX_HUNTERS) spawnHunter();
-          // Floor ~120 frames even at soft-cap — never spam
-          const dens = Math.max(120, 260 - tD * 130);
-          nextHunter = dens + Math.random() * 40;
+          const base = level < 11 ? 320 : (level < 31 ? 180 : 125);
+          nextAnimal = base + (spawned === "dragon" || spawned === "eagle" ? 220 : spawned === "hold" ? 80 : 0);
         }
         nextWaterfall -= k;
         if (nextWaterfall <= 0 && level >= 5) {
@@ -8301,17 +8350,47 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (a.fade <= 0) animals.splice(i, 1);
         continue;
       }
-      if (a.kind === "bat") {
+      if (a.recoil > 0) { a.recoil--; a.x += 1.5; }
+      if (a.kind === "bat" || a.kind === "imp") {
         a.x += a.vx * k;
         a.y += Math.sin(a.phase) * 2.1 * (a.zig || 1);
-      } else if (a.kind === "raven") {
+      } else if (a.kind === "raven" || a.kind === "vulture") {
         a.x += a.vx * k;
-        const pull = (bird.y - a.y) * 0.03;
+        const pull = (bird.y - a.y) * (a.kind === "vulture" ? 0.045 : 0.03);
         a.vy = (a.vy || 0) * 0.9 + Math.max(-1.35, Math.min(1.35, pull));
         a.y += a.vy;
       } else if (a.kind === "wasp") {
         a.x += a.vx * k;
         a.y += Math.max(-0.48, Math.min(0.48, (bird.y - a.y) * 0.016)) + Math.sin(a.phase) * 0.35;
+      } else if (a.kind === "wraith" || a.kind === "frost") {
+        a.x += a.vx * 0.65 * k;
+        a.y += Math.sin(a.phase * 0.8) * 0.9;
+        a.veil = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin(a.phase * 0.7));
+        a.hazard = a.veil > 0.62;
+      } else if (a.kind === "eel") {
+        a.x += a.vx * k;
+        a.y += Math.sin(a.phase) * 1.5;
+        a.trail.unshift({ x: a.x, y: a.y });
+        if (a.trail.length > 7) a.trail.pop();
+      } else if (a.kind === "gargoyle") {
+        a.dive = (a.dive | 0) + 1;
+        if (a.dive < 46) a.x += a.vx * 0.45 * k;
+        else if (a.dive < 78) {
+          a.x += a.vx * 1.7 * k;
+          a.y += Math.max(-2.1, Math.min(2.1, (bird.y - a.y) * 0.07));
+        } else a.dive = 0;
+      } else if (a.kind === "drake" || a.kind === "dragon" || a.kind === "eye") {
+        const hold = bird.x + (a.kind === "dragon" ? 220 : 168);
+        if (a.x > hold + 24) a.x += a.vx * k;
+        else a.x += (hold - a.x) * 0.05;
+        const lane = PLAY_H * (0.32 + 0.36 * (0.5 + 0.5 * Math.sin(a.phase * 0.35)));
+        a.y += Math.max(-1.05, Math.min(1.05, (lane - a.y) * 0.045));
+        if (a.x < hold + 50) {
+          a.wind = (a.wind | 0) + 1;
+          const need = a.kind === "dragon" ? 70 : 54;
+          a.glow = a.wind > need - 22 ? 1 : 0;
+          if (a.wind >= need) { a.wind = 0; a.glow = 0; breatheAt(a); }
+        }
       } else {
         a.x += a.vx * k;
         a.y += Math.sin(a.phase) * 0.45 + Math.max(-0.35, Math.min(0.35, (bird.y - a.y) * 0.008));
@@ -8334,6 +8413,25 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       const f = feathers[i];
       f.x += f.vx; f.y += f.vy; f.rot += f.vr; f.life--;
       if (f.life <= 0) feathers.splice(i, 1);
+    }
+    for (let i = dragonShots.length - 1; i >= 0; i--) {
+      const s = dragonShots[i];
+      s.x += s.vx * k;
+      s.y += s.vy * k;
+      s.life -= k;
+      if (s.y < 22 || s.y > PLAY_H - 22 || s.life <= 0 || s.x < bird.x - 36) {
+        dragonShots.splice(i, 1);
+        continue;
+      }
+      if (playing) {
+        const here = birdFocus();
+        const dx = here.x - s.x, dy = here.y - s.y, rr = bird.r + s.r - 4;
+        if (dx * dx + dy * dy < rr * rr) {
+          dragonShots.splice(i, 1);
+          gameOver();
+          return;
+        }
+      }
     }
 
     // Hunters
@@ -8779,14 +8877,30 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const flap = Math.sin(a.phase);
     ctx.save();
     ctx.translate(s.x, s.y);
-    ctx.globalAlpha = Math.max(0, a.fade == null ? 1 : a.fade);
-    if (a.kind === "bat") drawBatBody(flap);
-    else if (a.kind === "raven") drawRavenBody(flap);
+    const veil = (a.kind === "wraith" || a.kind === "frost") ? (a.veil == null ? 1 : a.veil) : 1;
+    ctx.globalAlpha = Math.max(0, (a.fade == null ? 1 : a.fade) * veil);
+    if (a.kind === "bat" || a.kind === "imp") drawBatBody(flap, a.kind === "imp");
+    else if (a.kind === "raven" || a.kind === "vulture") drawRavenBody(flap, a.kind === "vulture");
     else if (a.kind === "wasp") drawWaspBody(flap);
-    else drawEagleBody(flap, a);
+    else if (a.kind === "eagle") drawEagleBody(flap, a);
+    else if (a.kind === "drake" || a.kind === "dragon") drawDragonBody(flap, a);
+    else if (a.kind === "gargoyle") drawGargoyleBody(flap);
+    else if (a.kind === "wraith" || a.kind === "frost") drawWraithBody(a.kind === "frost");
+    else if (a.kind === "eel") drawEelBody(a);
+    else if (a.kind === "eye") drawEyeBody(flap, a);
+    else drawBatBody(flap, false);
+    if ((a.hp || 1) > 1 && !a.dispersing) {
+      const w = a.kind === "dragon" ? 40 : 24;
+      const left = Math.max(0, a.hp - (a.dmg | 0)) / a.hp;
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(-w / 2, -a.r - 16, w, 4);
+      ctx.fillStyle = left > 0.45 ? "#c62828" : "#ffb03a";
+      ctx.fillRect(-w / 2, -a.r - 16, w * left, 4);
+    }
     ctx.restore();
   }
-  function drawBatBody(flap) {
+  function drawBatBody(flap, imp) {
     const lift = flap * 7;
     ctx.fillStyle = "#241910";
     ctx.beginPath();
@@ -8819,15 +8933,27 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.moveTo(-2.2, 6); ctx.lineTo(-4.2, 11); ctx.lineTo(-0.6, 7.2); ctx.closePath(); ctx.fill();
     ctx.beginPath();
     ctx.moveTo(2.2, 6); ctx.lineTo(4.2, 11); ctx.lineTo(0.6, 7.2); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#f3d48a";
+    ctx.fillStyle = imp ? "#ff6a1a" : "#ff2a22";
     ctx.beginPath();
-    ctx.arc(-1.3, 7.4, 0.9, 0, Math.PI * 2);
-    ctx.arc(1.3, 7.4, 0.9, 0, Math.PI * 2);
+    ctx.arc(-1.3, 7.4, 0.95, 0, Math.PI * 2);
+    ctx.arc(1.3, 7.4, 0.95, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = "#f2e6d0";
+    ctx.beginPath();
+    ctx.moveTo(-1.1, 9.2); ctx.lineTo(-0.4, 11.2); ctx.lineTo(0.2, 9.2); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(0.4, 9.2); ctx.lineTo(1.1, 11.2); ctx.lineTo(1.8, 9.2); ctx.fill();
+    if (imp) {
+      ctx.fillStyle = "#ffb15a";
+      ctx.beginPath();
+      ctx.moveTo(-2, 4); ctx.lineTo(-5, 1); ctx.lineTo(-1, 5); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(2, 4); ctx.lineTo(5, 1); ctx.lineTo(1, 5); ctx.fill();
+    }
   }
-  function drawRavenBody(flap) {
+  function drawRavenBody(flap, vulture) {
     const wing = flap * 5;
-    ctx.fillStyle = "#1c1e24";
+    ctx.fillStyle = vulture ? "#2a241c" : "#1c1e24";
     ctx.beginPath();
     ctx.moveTo(-3, -2);
     ctx.quadraticCurveTo(-18, -8 + wing, -26, 2);
@@ -8860,11 +8986,21 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillStyle = "#f0b429";
     ctx.beginPath();
     ctx.moveTo(-1.6, 7); ctx.lineTo(1.6, 7); ctx.lineTo(0, 13); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#f4e2a0";
+    ctx.fillStyle = "#ff2a22";
     ctx.beginPath();
     ctx.arc(-1.6, 3.2, 1.05, 0, Math.PI * 2);
     ctx.arc(1.6, 3.2, 1.05, 0, Math.PI * 2);
     ctx.fill();
+    if (vulture) {
+      ctx.strokeStyle = "#c8c2b4";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-16, 2); ctx.lineTo(-22, 8);
+      ctx.moveTo(16, 2); ctx.lineTo(22, 8);
+      ctx.moveTo(-10, 4); ctx.lineTo(-12, 10);
+      ctx.moveTo(10, 4); ctx.lineTo(12, 10);
+      ctx.stroke();
+    }
     ctx.fillStyle = "#1a1a1a";
     ctx.beginPath();
     ctx.arc(-1.6, 3.4, 0.45, 0, Math.PI * 2);
@@ -8875,7 +9011,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const wingA = 0.35 + flap * 0.25;
     ctx.save();
     ctx.globalAlpha *= 0.55;
-    ctx.fillStyle = "#e7f4ff";
+    ctx.fillStyle = "#6a6258";
     ctx.beginPath();
     ctx.ellipse(-5, -1, 6, 2.2, -0.5 + wingA, 0, Math.PI * 2);
     ctx.ellipse(5, -1, 6, 2.2, 0.5 - wingA, 0, Math.PI * 2);
@@ -8899,10 +9035,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillStyle = "#111";
     ctx.beginPath();
     ctx.moveTo(0, 8); ctx.lineTo(-0.7, 11); ctx.lineTo(0.7, 11); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#222";
+    ctx.fillStyle = "#ff2a22";
     ctx.beginPath();
-    ctx.arc(-1.5, 5.6, 0.45, 0, Math.PI * 2);
-    ctx.arc(1.5, 5.6, 0.45, 0, Math.PI * 2);
+    ctx.arc(-1.5, 5.6, 0.55, 0, Math.PI * 2);
+    ctx.arc(1.5, 5.6, 0.55, 0, Math.PI * 2);
     ctx.fill();
   }
   function drawEagleBody(flap, a) {
@@ -8948,10 +9084,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.fillStyle = "#f0b429";
     ctx.beginPath();
     ctx.moveTo(-1.8, 14); ctx.lineTo(1.8, 14); ctx.lineTo(0, 20); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#1a140c";
+    ctx.fillStyle = "#ff3a2a";
     ctx.beginPath();
-    ctx.arc(-1.8, 9.2, 0.9, 0, Math.PI * 2);
-    ctx.arc(1.8, 9.2, 0.9, 0, Math.PI * 2);
+    ctx.arc(-1.8, 9.2, 0.95, 0, Math.PI * 2);
+    ctx.arc(1.8, 9.2, 0.95, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#f6f1e6";
     ctx.beginPath();
@@ -8964,6 +9100,150 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       ctx.arc(0, 0, 22 + (a.dmg | 0) * 2, 0.2, 1.1);
       ctx.stroke();
     }
+  }
+  function drawDragonBody(flap, a) {
+    const big = a.kind === "dragon";
+    const sc = big ? 1.35 : 0.82;
+    const wing = flap * (big ? 8 : 5);
+    ctx.save();
+    ctx.scale(sc, sc);
+    ctx.fillStyle = "#1a120e";
+    ctx.beginPath();
+    ctx.moveTo(-4, -2);
+    ctx.quadraticCurveTo(-30, -18 + wing, -48, 0);
+    ctx.quadraticCurveTo(-24, 10, -4, 6);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(4, -2);
+    ctx.quadraticCurveTo(30, -18 + wing, 48, 0);
+    ctx.quadraticCurveTo(24, 10, 4, 6);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#3a2418";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-8, 2); ctx.lineTo(-22, -2 + wing * 0.4); ctx.lineTo(-40, 2);
+    ctx.moveTo(8, 2); ctx.lineTo(22, -2 + wing * 0.4); ctx.lineTo(40, 2);
+    ctx.stroke();
+    const body = ctx.createLinearGradient(0, -14, 0, 16);
+    body.addColorStop(0, "#3a2a24");
+    body.addColorStop(1, "#120c0a");
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(0, 2, 8, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2a1814";
+    ctx.beginPath();
+    ctx.moveTo(-5, 7); ctx.lineTo(-11, 1); ctx.lineTo(-2, 8); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(5, 7); ctx.lineTo(11, 1); ctx.lineTo(2, 8); ctx.fill();
+    ctx.fillStyle = "#ff5a18";
+    ctx.beginPath(); ctx.arc(-2.2, 8, 1.3, 0, Math.PI * 2); ctx.arc(2.2, 8, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e8d2a0";
+    ctx.beginPath(); ctx.moveTo(-2, 12); ctx.lineTo(2, 12); ctx.lineTo(0, 18); ctx.closePath(); ctx.fill();
+    if (a.glow) {
+      const g = ctx.createRadialGradient(0, 16, 1, 0, 18, 14);
+      g.addColorStop(0, "rgba(255,220,120,0.95)");
+      g.addColorStop(1, "rgba(255,60,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 18, 14, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawGargoyleBody(flap) {
+    const wing = flap * 4;
+    ctx.fillStyle = "#6e7480";
+    ctx.beginPath();
+    ctx.moveTo(-3, 0); ctx.lineTo(-22, -8 + wing); ctx.lineTo(-16, 8); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(3, 0); ctx.lineTo(22, -8 + wing); ctx.lineTo(16, 8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#8b919c";
+    ctx.beginPath(); ctx.ellipse(0, 2, 6, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#5c616a";
+    ctx.beginPath();
+    ctx.moveTo(-4, 4); ctx.lineTo(-7, -2); ctx.lineTo(-1, 5); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(4, 4); ctx.lineTo(7, -2); ctx.lineTo(1, 5); ctx.fill();
+    ctx.fillStyle = "#d6deea";
+    ctx.fillRect(-2.2, 8, 1.4, 1.4);
+    ctx.fillRect(0.8, 8, 1.4, 1.4);
+    ctx.fillStyle = "#4a4038";
+    ctx.beginPath(); ctx.moveTo(-1.2, 11); ctx.lineTo(1.2, 11); ctx.lineTo(0, 15); ctx.fill();
+  }
+  function drawWraithBody(frost) {
+    const c0 = frost ? "rgba(170,220,255,0.15)" : "rgba(40,20,60,0.2)";
+    const c1 = frost ? "#9fd8ff" : "#2a1038";
+    const g = ctx.createRadialGradient(0, 4, 2, 0, 2, 18);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c0);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 2, 10, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = frost ? "#e8f7ff" : "#c9b6ff";
+    ctx.beginPath(); ctx.arc(-3, 6, 1.3, 0, Math.PI * 2); ctx.arc(3, 6, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = frost ? "#7ec8ff" : "#6a5088";
+    ctx.beginPath();
+    ctx.moveTo(-6, -6); ctx.quadraticCurveTo(0, -16, 6, -6); ctx.lineTo(0, -2); ctx.fill();
+  }
+  function drawEelBody(a) {
+    const pts = a.trail && a.trail.length ? a.trail : [{ x: a.x, y: a.y }];
+    ctx.strokeStyle = "#1c3a46";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const p = foeScreen(pts[i].x, pts[i].y);
+      const lx = p.x - foeScreen(a.x, a.y).x;
+      const ly = p.y - foeScreen(a.x, a.y).y;
+      if (i) ctx.lineTo(lx, ly); else ctx.moveTo(lx, ly);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(120,220,255,0.85)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = "#16323c";
+    ctx.beginPath(); ctx.ellipse(0, 4, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#9af0ff";
+    ctx.beginPath(); ctx.arc(-1.6, 6, 1, 0, Math.PI * 2); ctx.arc(1.6, 6, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#d7fff6";
+    ctx.beginPath(); ctx.moveTo(-1.4, 9); ctx.lineTo(1.4, 9); ctx.lineTo(0, 13); ctx.fill();
+  }
+  function drawEyeBody(flap, a) {
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
+    g.addColorStop(0, "#2a2418");
+    g.addColorStop(1, "#100c08");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#5a4630";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = a.glow ? "#ffd36a" : "#f2e2a8";
+    ctx.beginPath(); ctx.arc(0, 2, 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#1a1008";
+    ctx.beginPath(); ctx.ellipse(0, 3.5, 1.6, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+    if (a.glow) {
+      ctx.strokeStyle = "rgba(255,210,90,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, 26); ctx.stroke();
+    }
+  }
+  function drawDragonShot(s) {
+    const p = foeScreen(s.x, s.y);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    if (s.beam) {
+      const g = ctx.createLinearGradient(0, -16, 0, 10);
+      g.addColorStop(0, "rgba(255,220,120,0)");
+      g.addColorStop(1, "rgba(255,230,140,0.95)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-2.2, -18, 4.4, 28);
+    } else {
+      const g = ctx.createRadialGradient(0, 4, 1, 0, 0, s.r + 6);
+      g.addColorStop(0, "#fff1c0");
+      g.addColorStop(0.45, "#ff6a1a");
+      g.addColorStop(1, "rgba(120,20,0,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(0, 0, s.r * 0.7, s.r + 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,80,10,0.45)";
+      ctx.beginPath(); ctx.ellipse(0, -s.r, s.r * 0.4, s.r * 0.8, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   // —— v1.18: witch-hunters evolve ——
@@ -11727,6 +12007,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
 
   function drawForwardFoes() {
     for (let i = 0; i < animals.length; i++) drawAnimal(animals[i]);
+    for (let i = 0; i < dragonShots.length; i++) drawDragonShot(dragonShots[i]);
     for (let i = 0; i < feathers.length; i++) drawFeather(feathers[i]);
     for (let i = 0; i < hunters.length; i++) drawHunter(hunters[i]);
     for (let i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
@@ -14078,7 +14359,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shotSetup: function (lv) {
         state = State.PLAY; pauseMode = 0; invulnFrames = 0; ghostPipesLeft = 0; puMode = null;
         const prev = score; score = (Math.max(1, lv | 0) - 1) * PIPES_PER_LEVEL; onScoreChanged(prev);
-        pipes.length = 0; coins.length = 0; hunters.length = 0; projectiles.length = 0; trees.length = 0; animals.length = 0; feathers.length = 0; waterfalls.length = 0;
+        pipes.length = 0; coins.length = 0; hunters.length = 0; projectiles.length = 0; trees.length = 0; animals.length = 0; feathers.length = 0; dragonShots.length = 0; waterfalls.length = 0;
         blackholes.length = 0; powerups.length = 0; pellets.length = 0; popRockets.length = 0; toys.length = 0; zaps.length = 0;
         confetti.length = 0; bolts.length = 0; flames.length = 0; sparks.length = 0; chunks.length = 0; puffs.length = 0; blasts.length = 0;
         particles.length = 0; floaters.length = 0; rings.length = 0; shipRockets.length = 0;
@@ -14142,9 +14423,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       grant: function (id) { grantOwned(id); },
       shopRows: function () { return buildShopRows().map(function (r) { return { title: r.title, header: r.header, sub: r.sub, chips: (r.chips || []).map(function (c) { return { label: c.label, action: c.action, itemId: c.itemId }; }) }; }); },
       setShopScroll: function (y) { shopScroll = y; clampShopScroll(); },
-      clearHazardsForShot: function () { trees.length = 0; animals.length = 0; feathers.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
+      clearHazardsForShot: function () { trees.length = 0; animals.length = 0; feathers.length = 0; dragonShots.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
       spawnAnimalAt: function (kind, x, y, extra) { return pushAnimal(kind || "bat", x, y, extra || null); },
-      animalPlan: function () { return { byWorld: ANIMAL_BY_WORLD, eagle: EAGLE_WORLDS, every: WORLD_EVERY }; },
+      foeBreath: function () { if (animals.length) breatheAt(animals[animals.length - 1]); },
+      animalPlan: function () { return { feature: WORLD_FEATURE, every: WORLD_EVERY, bossFrom: 15 }; },
       artReady: function () { return !!PHOENIX_ART.ready; },
       shareTextNow: function () { return shareMessage(); },
       openShare: function () { shareRun(); return shareMessage(); },
