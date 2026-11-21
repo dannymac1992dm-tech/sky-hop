@@ -2161,7 +2161,8 @@
 
   // —— Extras world entities ——
   const trees = [];       // bg/fg scenery + trunk obstacles
-  const animals = [];     // flavor critters + mild hazards
+  const animals = [];     // world animals: bats, ravens, wasps, storm eagles
+  const feathers = [];    // defeat puff: feathers drift up the screen, no gore
   const hunters = [];     // hostile bird hunters
   const projectiles = []; // nets / shots from hunters
   const waterfalls = [];  // scenic + optional mild push
@@ -3709,6 +3710,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     rings.push({ x: x, y: y, r: 6, max: R * 0.9, life: 1, color: "255,150,215" }); rings.push({ x: x, y: y, r: 4, max: R * 0.75, life: 1, color: "120,240,200" });
     rings.push({ x: x, y: y, r: 8, max: R, life: 1, color: "255,214,240" });
     rings.push({ x: x, y: y, r: 4, max: R * 0.62, life: 1, color: "190,240,255" });
+    animalHit(x, y, R, 2);
     for (let i = 0; i < hunters.length; i++) {
       const h = hunters[i], dx = h.x - x, dy = (h.y - 4) - y;
       if (!(h.stun > 0) && dx * dx + dy * dy < (R + 14) * (R + 14)) stunHunter(h, 130, 5);
@@ -3925,6 +3927,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         beam.pts = window.SkyHopFlight.beamPolyline({ x: src.x, y: src.y }, aim, 4, beam.phase);
         beam.tip = window.SkyHopFlight.pointAlong(beam.pts, beam.u);
         beam.locked = !!(live && beam.u > 0.9);
+        if ((frame % 4) === i) animalHit(beam.tip.x, beam.tip.y, 18, 1);
         if (beam.locked && (frame % 4) === i) {
           crackPipe(live.p, live.side, 1, live.x, live.y, false, "laser");
           laserGlow = Math.min(1, laserGlow + 0.45);
@@ -3937,7 +3940,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     if (emberAura > 0) {
       emberAura--;
       const here = birdFocus();
-      if ((emberAura % 6) === 0) crackPipesNear(here.x, here.y, 34, 1);
+      if ((emberAura % 6) === 0) { crackPipesNear(here.x, here.y, 34, 1); animalHit(here.x, here.y, 34, 1); }
       flameFx(here.x + (Math.random() - 0.5) * 16, here.y + (Math.random() - 0.5) * 12, 0.6, 0, 10, 3);
     }
     for (let i = fireballs.length - 1; i >= 0; i--) {
@@ -3946,7 +3949,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       flameFx(b.x - 14, b.y, -0.6, (Math.random() - 0.5) * 0.25, 10, 6);
       let gone = b.life <= 0 || b.x > W + 30;
       if (!gone) {
-        const sg = pipeSegAt(b.x, b.y, b.r || 16);
+        if (animalHit(b.x, b.y, b.r || 16, 2)) gone = true;
+        const sg = !gone && pipeSegAt(b.x, b.y, b.r || 16);
         if (sg) { crackPipe(sg.p, sg.side, 2, b.x, b.y, false, "fireball"); gone = true; }
       }
       if (gone) fireballs.splice(i, 1);
@@ -3956,7 +3960,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       a.x += a.vx; a.y += a.vy; a.life--;
       let gone = a.life <= 0 || a.x > W + 16 || a.pierce <= 0;
       if (!gone) {
-        const sg = pipeSegAt(a.x, a.y, 10);
+        if (animalHit(a.x, a.y, 10, 1)) { a.pierce--; if (a.pierce <= 0) gone = true; }
+        const sg = !gone && pipeSegAt(a.x, a.y, 10);
         if (sg) { crackPipe(sg.p, sg.side, 1, a.x, a.y, false, "arrow"); a.pierce--; if (a.pierce <= 0) gone = true; }
       }
       if (gone) fireArrows.splice(i, 1);
@@ -3967,7 +3972,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       flameFx(m.x, m.y, 0.8, 0, 10, 8);
       let gone = m.life <= 0 || m.x < bird.x - 20;
       if (!gone) {
-        const sg = pipeSegAt(m.x, m.y, m.r || 18);
+        if (animalHit(m.x, m.y, m.r || 18, 2)) gone = true;
+        const sg = !gone && pipeSegAt(m.x, m.y, m.r || 18);
         if (sg) { crackPipe(sg.p, sg.side, 2, m.x, m.y, false, "meteor"); gone = true; }
       }
       if (gone) meteors.splice(i, 1);
@@ -4006,6 +4012,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
       p.x += p.vx; p.y += p.vy; p.life--;
       let gone = p.life <= 0 || p.x > W + 20 || p.y < -10 || p.y > PLAY_H + 10;
+      if (!gone && animalHit(p.x, p.y, 7, pelletHurt())) gone = true;
       if (!gone) {
         for (let j = 0; j < hunters.length; j++) {
           const h = hunters[j];
@@ -4052,6 +4059,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
           else { const k = projectiles.indexOf(r.tgt); if (k >= 0) projectiles.splice(k, 1); poofFx(r.x, r.y, true); fireBurst(r.x, r.y, 12); sparkRing(r.x, r.y, 6, 3); }
         }
       }
+      if (!pop && animalHit(r.x, r.y, 16, 2)) { pop = true; fireBurst(r.x, r.y, 10); }
       if (!pop && (r.life <= 0 || r.x > W + 14 || r.y < -10 || r.y > PLAY_H + 10)) { pop = true; if (r.x < W + 4 && r.y > 0 && r.y < PLAY_H) { poofFx(r.x, r.y, true); fireBurst(r.x, r.y, 7); } }
       if (pop) popRockets.splice(i, 1);
     }
@@ -6580,6 +6588,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   function clearExtras() {
     trees.length = 0;
     animals.length = 0;
+    feathers.length = 0;
     hunters.length = 0;
     projectiles.length = 0;
     waterfalls.length = 0;
@@ -6925,6 +6934,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     hunters.length = 0;
     for (let i = 0; i < snap.hunters.length; i++) hunters.push(Object.assign({}, snap.hunters[i]));
     animals.length = 0;
+    feathers.length = 0;
     for (let i = 0; i < snap.animals.length; i++) animals.push(Object.assign({}, snap.animals[i]));
     projectiles.length = 0;
     for (let i = 0; i < snap.projectiles.length; i++) projectiles.push(Object.assign({}, snap.projectiles[i]));
@@ -8055,34 +8065,111 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     });
   }
 
+  // One animal family per world, on the same spawn clock the old critters used.
+  // Eagles are rare and only in the sky worlds, so they replace a regular spawn instead of adding one.
+  const ANIMAL_BY_WORLD = {
+    day: "bat", desert: "wasp", snow: "raven", city: "bat", space: "bat",
+    blossom: "wasp", reef: "raven", volcano: "bat", candy: "raven"
+  };
+  const EAGLE_WORLDS = { snow: 1, space: 1, candy: 1 };
+  function animalKindForWorld() {
+    const id = worldDefAt(worldIndexFor(level)).id;
+    const eagleUp = EAGLE_WORLDS[id] && level >= 11 && !animals.some(function (a) { return a.kind === "eagle" && !a.dispersing; });
+    if (eagleUp && Math.random() < 0.12) return "eagle";
+    if (id === "blossom" && Math.random() < 0.45) return "raven";
+    return ANIMAL_BY_WORLD[id] || "bat";
+  }
+  function pushAnimal(kind, x, y, extra) {
+    const a = {
+      x: x, y: y, kind: kind, flying: true, hazard: true,
+      phase: Math.random() * 6.28, bob: Math.random() * 6.28,
+      dispersing: 0, fade: 1, dmg: 0, hp: 1, r: 8,
+      vx: -(pipeSpeed * 0.7), vy: 0, zig: Math.random() < 0.5 ? 1 : -1, gid: 0
+    };
+    if (kind === "bat") { a.r = 7; a.vx = -(pipeSpeed * 1.02); }
+    else if (kind === "raven") { a.r = 11; a.vx = -(pipeSpeed * 0.78); a.hp = 1; }
+    else if (kind === "wasp") { a.r = 5; a.vx = -(pipeSpeed * 0.4); }
+    else if (kind === "eagle") { a.r = 18; a.vx = -(pipeSpeed * 0.48); a.hp = 4; }
+    if (extra) Object.assign(a, extra);
+    animals.push(a);
+    return a;
+  }
+  function featherBurst(x, y, n, col) {
+    for (let i = 0; i < n && feathers.length < 48; i++) {
+      feathers.push({
+        x: x, y: y,
+        vx: 0.35 + Math.random() * 1.15,
+        vy: (Math.random() - 0.5) * 1.5,
+        life: 26 + Math.random() * 18, max: 44,
+        rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.18,
+        c: col || "#d9d0c4", s: 3 + Math.random() * 2.6
+      });
+    }
+    smokeFx(x, y, Math.min(6, 2 + (n >> 1)), 12, true);
+  }
+  function disperseGroup(gid, x, y) {
+    let n = 0;
+    for (let i = 0; i < animals.length; i++) {
+      const a = animals[i];
+      if (a.gid !== gid || a.dispersing) continue;
+      a.dispersing = 1; a.hazard = false; a.fade = 1;
+      a.vx = 0.45 + Math.random() * 0.9;
+      a.vy = (Math.random() - 0.5) * 2.2;
+      n++;
+    }
+    if (n) featherBurst(x, y, 5, "#f0e2a0");
+  }
+  function defeatAnimal(a) {
+    const i = animals.indexOf(a);
+    if (i < 0) return;
+    animals.splice(i, 1);
+    const col = a.kind === "raven" ? "#3a3a40" : (a.kind === "eagle" ? "#efe6d4" : "#c4b4a0");
+    featherBurst(a.x, a.y, a.kind === "eagle" ? 12 : 6, col);
+    if (a.kind === "eagle") {
+      for (let k = 0; k < 3; k++) coins.push({ x: a.x - 8, y: a.y + (k - 1) * 14, value: 1, risky: false, spin: 0, pulled: false, pipe: null, dx: 0, gy: 0 });
+    }
+  }
+  function hurtAnimal(a, dmg) {
+    if (!a || a.dispersing) return false;
+    if (a.kind === "wasp") { disperseGroup(a.gid, a.x, a.y); return true; }
+    a.dmg = (a.dmg | 0) + (dmg || 1);
+    if (a.dmg >= (a.hp || 1)) defeatAnimal(a);
+    else smokeFx(a.x, a.y, 3, 8, true);
+    return true;
+  }
+  function animalHit(x, y, rad, dmg) {
+    let hit = false;
+    for (let i = animals.length - 1; i >= 0; i--) {
+      const a = animals[i];
+      if (!a || a.dispersing) continue;
+      const dx = a.x - x, dy = a.y - y, rr = rad + a.r;
+      if (dx * dx + dy * dy < rr * rr) { hurtAnimal(a, dmg); hit = true; break; }
+    }
+    return hit;
+  }
   function spawnAnimal() {
-    if (!extrasOn) return;
-    const kinds = ["bunny", "butterfly", "squirrel", "dragonfly"];
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
-    const flying = kind === "butterfly" || kind === "dragonfly";
-    if (!flying) return;
-    let y;
-    if (flying) {
-      y = 40 + Math.random() * (PLAY_H - 100);
-    } else {
-      y = PLAY_H - 18;
+    if (!extrasOn) return "";
+    const kind = animalKindForWorld();
+    let y0 = 64 + Math.random() * (PLAY_H - 150);
+    if (nearPipeGap(W + 36, y0, 30)) y0 = Math.max(48, Math.min(PLAY_H - 70, y0 + (y0 < PLAY_H / 2 ? 54 : -54)));
+    const gid = frame + Math.random();
+    if (kind === "bat") {
+      const n = level < 10 ? 2 : 3;
+      for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
+        pushAnimal("bat", W + 22 + i * 14, y0 + (i - (n - 1) / 2) * 24, { gid: gid, zig: i % 2 ? 1 : -1, phase: i * 1.4 });
+      }
+    } else if (kind === "wasp") {
+      const n = level < 10 ? 3 : 4;
+      for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
+        const ang = (i / n) * Math.PI * 2;
+        pushAnimal("wasp", W + 28 + Math.cos(ang) * 12, y0 + Math.sin(ang) * 14, { gid: gid, phase: ang });
+      }
+    } else if (kind === "eagle") {
+      if (animals.length < MAX_ANIMALS) pushAnimal("eagle", W + 46, y0, { gid: gid });
+    } else if (animals.length < MAX_ANIMALS) {
+      pushAnimal("raven", W + 30, y0, { gid: gid });
     }
-    // Mild hazards from mid levels: a few faster critters
-    const hazard = level >= 30 && Math.random() < 0.18 + difficultyT(level) * 0.22;
-    if (hazard && nearPipeGap(W + 30, y, 28)) {
-      y = Math.min(PLAY_H - 40, y + 50);
-    }
-    animals.push({
-      x: W + 30,
-      y,
-      kind,
-      flying,
-      hazard,
-      vx: -(pipeSpeed * (0.6 + Math.random() * 0.5)),
-      bob: Math.random() * Math.PI * 2,
-      phase: Math.random() * Math.PI * 2,
-      r: hazard ? 12 : 10,
-    });
+    return kind;
   }
 
   function spawnHunter() {
@@ -8148,9 +8235,12 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       }
       if (extrasOn) {
         nextAnimal -= k;
-        if (nextAnimal <= 0 && level >= 8) {
-          if (animals.length < MAX_ANIMALS) spawnAnimal();
-          nextAnimal = Math.max(70, 140 - tD * 65);
+        if (nextAnimal <= 0 && level >= 2) {
+          let spawned = "";
+          if (animals.length < MAX_ANIMALS) spawned = spawnAnimal();
+          // Longer gap than the old critter clock so groups and chasers do not stack on the hunters.
+          const base = level < 8 ? 240 : Math.max(130, 220 - tD * 60);
+          nextAnimal = base + (spawned === "eagle" ? 200 : spawned === "bat" ? 30 : 0);
         }
         nextHunter -= k;
         if (nextHunter <= 0 && level >= 35) {
@@ -8200,25 +8290,50 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (wf.x + wf.w < -20) waterfalls.splice(i, 1);
     }
 
-    // Animals
+    // Animals. They fly down the screen (world -x) toward the bird. Leaving the screen just removes them.
     for (let i = animals.length - 1; i >= 0; i--) {
       const a = animals[i];
-      a.x += a.vx * k; // a.vx already includes leftward motion
-      a.bob += 0.08;
-      a.phase += 0.12;
-      if (a.flying) {
-        a.y += Math.sin(a.bob) * 0.6;
+      a.phase += a.kind === "bat" ? 0.28 : (a.kind === "wasp" ? 0.36 : 0.12);
+      if (a.dispersing) {
+        a.fade -= 0.028;
+        a.x += a.vx;
+        a.y += a.vy;
+        if (a.fade <= 0) animals.splice(i, 1);
+        continue;
       }
+      if (a.kind === "bat") {
+        a.x += a.vx * k;
+        a.y += Math.sin(a.phase) * 2.1 * (a.zig || 1);
+      } else if (a.kind === "raven") {
+        a.x += a.vx * k;
+        const pull = (bird.y - a.y) * 0.03;
+        a.vy = (a.vy || 0) * 0.9 + Math.max(-1.35, Math.min(1.35, pull));
+        a.y += a.vy;
+      } else if (a.kind === "wasp") {
+        a.x += a.vx * k;
+        a.y += Math.max(-0.48, Math.min(0.48, (bird.y - a.y) * 0.016)) + Math.sin(a.phase) * 0.35;
+      } else {
+        a.x += a.vx * k;
+        a.y += Math.sin(a.phase) * 0.45 + Math.max(-0.35, Math.min(0.35, (bird.y - a.y) * 0.008));
+      }
+      if (a.y < 28) a.y = 28;
+      else if (a.y > PLAY_H - 28) a.y = PLAY_H - 28;
       if (playing && a.hazard) {
         const here = birdFocus();
         const dx = here.x - a.x;
         const dy = here.y - a.y;
-        if (dx * dx + dy * dy < (bird.r + a.r - 2) * (bird.r + a.r - 2)) {
+        const rr = bird.r + a.r - 3;
+        if (dx * dx + dy * dy < rr * rr) {
           gameOver();
           return;
         }
       }
-      if (a.x < -40) animals.splice(i, 1);
+      if (a.x < -60) animals.splice(i, 1);
+    }
+    for (let i = feathers.length - 1; i >= 0; i--) {
+      const f = feathers[i];
+      f.x += f.vx; f.y += f.vy; f.rot += f.vr; f.life--;
+      if (f.life <= 0) feathers.splice(i, 1);
     }
 
     // Hunters
@@ -8640,59 +8755,215 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     }
   }
 
-  function drawAnimal(a) {
+  function drawFeather(f) {
+    const s = foeScreen(f.x, f.y);
     ctx.save();
-    ctx.translate(a.x, a.y);
-    if (a.kind === "butterfly") {
-      const flap = Math.sin(a.phase) * 0.6;
-      ctx.fillStyle = a.hazard ? "#e06080" : "#ff90c0";
-      ctx.beginPath();
-      ctx.ellipse(-6, 0, 7, 5, -0.4 + flap, 0, Math.PI * 2);
-      ctx.ellipse(6, 0, 7, 5, 0.4 - flap, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#444";
-      ctx.fillRect(-1, -4, 2, 8);
-    } else if (a.kind === "dragonfly") {
-      ctx.fillStyle = a.hazard ? "#40c0a0" : "#70e0c0";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 10, 3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = "#c0fff0";
-      ctx.beginPath();
-      ctx.ellipse(-2, -4, 8, 3, -0.2, 0, Math.PI * 2);
-      ctx.ellipse(-2, 4, 8, 3, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    } else if (a.kind === "bunny") {
-      ctx.fillStyle = a.hazard ? "#d0a080" : "#f5e6d3";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // ears
-      ctx.beginPath();
-      ctx.ellipse(-4, -10, 3, 8, -0.2, 0, Math.PI * 2);
-      ctx.ellipse(4, -10, 3, 8, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#222";
-      ctx.beginPath();
-      ctx.arc(3, -2, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // squirrel
-      ctx.fillStyle = a.hazard ? "#a06030" : "#c07840";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 9, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(-10, -4, 6, 8, -0.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#222";
-      ctx.beginPath();
-      ctx.arc(4, -2, 1.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.translate(s.x, s.y);
+    ctx.rotate(Math.sin(f.rot) * 0.4);
+    ctx.globalAlpha = Math.max(0, f.life / f.max);
+    ctx.fillStyle = f.c;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, f.s * 0.38, f.s, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(40,30,20,0.45)";
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(0, -f.s);
+    ctx.lineTo(0, f.s);
+    ctx.stroke();
     ctx.restore();
+  }
+  /** Screen-space animal. Head and beak point down the screen, toward the bird. Wings open left and right. */
+  function drawAnimal(a) {
+    const s = foeScreen(a.x, a.y);
+    const flap = Math.sin(a.phase);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.globalAlpha = Math.max(0, a.fade == null ? 1 : a.fade);
+    if (a.kind === "bat") drawBatBody(flap);
+    else if (a.kind === "raven") drawRavenBody(flap);
+    else if (a.kind === "wasp") drawWaspBody(flap);
+    else drawEagleBody(flap, a);
+    ctx.restore();
+  }
+  function drawBatBody(flap) {
+    const lift = flap * 7;
+    ctx.fillStyle = "#241910";
+    ctx.beginPath();
+    ctx.moveTo(-2, 0);
+    ctx.quadraticCurveTo(-14, -6 + lift, -20, 3 + lift * 0.3);
+    ctx.quadraticCurveTo(-16, 8 + lift * 0.2, -8, 6);
+    ctx.quadraticCurveTo(-4, 3, -2, 1);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(2, 0);
+    ctx.quadraticCurveTo(14, -6 + lift, 20, 3 + lift * 0.3);
+    ctx.quadraticCurveTo(16, 8 + lift * 0.2, 8, 6);
+    ctx.quadraticCurveTo(4, 3, 2, 1);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(90,60,40,0.55)";
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-2, 1); ctx.lineTo(-12, 2 + lift * 0.4); ctx.lineTo(-18, 4);
+    ctx.moveTo(2, 1); ctx.lineTo(12, 2 + lift * 0.4); ctx.lineTo(18, 4);
+    ctx.stroke();
+    const body = ctx.createLinearGradient(0, -6, 0, 10);
+    body.addColorStop(0, "#5a4638");
+    body.addColorStop(1, "#1a120e");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 3.6, 6.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#140e0c";
+    ctx.beginPath();
+    ctx.moveTo(-2.2, 6); ctx.lineTo(-4.2, 11); ctx.lineTo(-0.6, 7.2); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(2.2, 6); ctx.lineTo(4.2, 11); ctx.lineTo(0.6, 7.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f3d48a";
+    ctx.beginPath();
+    ctx.arc(-1.3, 7.4, 0.9, 0, Math.PI * 2);
+    ctx.arc(1.3, 7.4, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawRavenBody(flap) {
+    const wing = flap * 5;
+    ctx.fillStyle = "#1c1e24";
+    ctx.beginPath();
+    ctx.moveTo(-3, -2);
+    ctx.quadraticCurveTo(-18, -8 + wing, -26, 2);
+    ctx.quadraticCurveTo(-14, 6, -4, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(3, -2);
+    ctx.quadraticCurveTo(18, -8 + wing, 26, 2);
+    ctx.quadraticCurveTo(14, 6, 4, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(180,180,190,0.28)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-4, 0); ctx.lineTo(-16, 1 + wing * 0.3);
+    ctx.moveTo(4, 0); ctx.lineTo(16, 1 + wing * 0.3);
+    ctx.stroke();
+    const body = ctx.createLinearGradient(0, -12, 0, 12);
+    body.addColorStop(0, "#3a3e48");
+    body.addColorStop(0.45, "#23262e");
+    body.addColorStop(1, "#101216");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 5.2, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#101216";
+    ctx.beginPath();
+    ctx.moveTo(-3, -8); ctx.lineTo(0, -14); ctx.lineTo(3, -8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f0b429";
+    ctx.beginPath();
+    ctx.moveTo(-1.6, 7); ctx.lineTo(1.6, 7); ctx.lineTo(0, 13); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#f4e2a0";
+    ctx.beginPath();
+    ctx.arc(-1.6, 3.2, 1.05, 0, Math.PI * 2);
+    ctx.arc(1.6, 3.2, 1.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.beginPath();
+    ctx.arc(-1.6, 3.4, 0.45, 0, Math.PI * 2);
+    ctx.arc(1.6, 3.4, 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawWaspBody(flap) {
+    const wingA = 0.35 + flap * 0.25;
+    ctx.save();
+    ctx.globalAlpha *= 0.55;
+    ctx.fillStyle = "#e7f4ff";
+    ctx.beginPath();
+    ctx.ellipse(-5, -1, 6, 2.2, -0.5 + wingA, 0, Math.PI * 2);
+    ctx.ellipse(5, -1, 6, 2.2, 0.5 - wingA, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    const body = ctx.createLinearGradient(0, -6, 0, 8);
+    body.addColorStop(0, "#f2c14a");
+    body.addColorStop(0.5, "#1a1a1a");
+    body.addColorStop(1, "#e0a020");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 1, 2.6, 5.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(-2.4, -1.2, 4.8, 1.1);
+    ctx.fillRect(-2.2, 1.4, 4.4, 1.1);
+    ctx.fillStyle = "#2a2418";
+    ctx.beginPath();
+    ctx.arc(0, 6.2, 2.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#111";
+    ctx.beginPath();
+    ctx.moveTo(0, 8); ctx.lineTo(-0.7, 11); ctx.lineTo(0.7, 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(-1.5, 5.6, 0.45, 0, Math.PI * 2);
+    ctx.arc(1.5, 5.6, 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function drawEagleBody(flap, a) {
+    const wing = flap * 6;
+    const left = ctx.createLinearGradient(-40, 0, 0, 8);
+    left.addColorStop(0, "#6a4a28");
+    left.addColorStop(1, "#2a1c12");
+    ctx.fillStyle = left;
+    ctx.beginPath();
+    ctx.moveTo(-4, -2);
+    ctx.quadraticCurveTo(-28, -16 + wing, -46, -2 + wing * 0.4);
+    ctx.quadraticCurveTo(-30, 8, -6, 6);
+    ctx.closePath();
+    ctx.fill();
+    const right = ctx.createLinearGradient(40, 0, 0, 8);
+    right.addColorStop(0, "#6a4a28");
+    right.addColorStop(1, "#2a1c12");
+    ctx.fillStyle = right;
+    ctx.beginPath();
+    ctx.moveTo(4, -2);
+    ctx.quadraticCurveTo(28, -16 + wing, 46, -2 + wing * 0.4);
+    ctx.quadraticCurveTo(30, 8, 6, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,220,160,0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-8, 1); ctx.lineTo(-24, -4 + wing * 0.5); ctx.lineTo(-40, 0);
+    ctx.moveTo(8, 1); ctx.lineTo(24, -4 + wing * 0.5); ctx.lineTo(40, 0);
+    ctx.stroke();
+    const body = ctx.createLinearGradient(0, -16, 0, 16);
+    body.addColorStop(0, "#8a6840");
+    body.addColorStop(0.4, "#4a321c");
+    body.addColorStop(1, "#24160e");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 8, 13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f4efe4";
+    ctx.beginPath();
+    ctx.ellipse(0, 10, 5.2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f0b429";
+    ctx.beginPath();
+    ctx.moveTo(-1.8, 14); ctx.lineTo(1.8, 14); ctx.lineTo(0, 20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#1a140c";
+    ctx.beginPath();
+    ctx.arc(-1.8, 9.2, 0.9, 0, Math.PI * 2);
+    ctx.arc(1.8, 9.2, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f6f1e6";
+    ctx.beginPath();
+    ctx.moveTo(-2, -8); ctx.lineTo(0, -16); ctx.lineTo(2, -8); ctx.closePath(); ctx.fill();
+    if ((a.dmg | 0) > 0) {
+      ctx.globalAlpha *= 0.85;
+      ctx.strokeStyle = "rgba(180,210,255,0.7)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22 + (a.dmg | 0) * 2, 0.2, 1.1);
+      ctx.stroke();
+    }
   }
 
   // —— v1.18: witch-hunters evolve ——
@@ -11455,6 +11726,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
   }
 
   function drawForwardFoes() {
+    for (let i = 0; i < animals.length; i++) drawAnimal(animals[i]);
+    for (let i = 0; i < feathers.length; i++) drawFeather(feathers[i]);
     for (let i = 0; i < hunters.length; i++) drawHunter(hunters[i]);
     for (let i = 0; i < projectiles.length; i++) drawProjectile(projectiles[i]);
   }
@@ -11471,7 +11744,6 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (showLand) for (const t of trees) {
         if (t.layer === "fg") drawTree(t);
       }
-      for (const a of animals) drawAnimal(a);
     }
   }
 
@@ -13806,7 +14078,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       shotSetup: function (lv) {
         state = State.PLAY; pauseMode = 0; invulnFrames = 0; ghostPipesLeft = 0; puMode = null;
         const prev = score; score = (Math.max(1, lv | 0) - 1) * PIPES_PER_LEVEL; onScoreChanged(prev);
-        pipes.length = 0; coins.length = 0; hunters.length = 0; projectiles.length = 0; trees.length = 0; animals.length = 0; waterfalls.length = 0;
+        pipes.length = 0; coins.length = 0; hunters.length = 0; projectiles.length = 0; trees.length = 0; animals.length = 0; feathers.length = 0; waterfalls.length = 0;
         blackholes.length = 0; powerups.length = 0; pellets.length = 0; popRockets.length = 0; toys.length = 0; zaps.length = 0;
         confetti.length = 0; bolts.length = 0; flames.length = 0; sparks.length = 0; chunks.length = 0; puffs.length = 0; blasts.length = 0;
         particles.length = 0; floaters.length = 0; rings.length = 0; shipRockets.length = 0;
@@ -13870,7 +14142,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       grant: function (id) { grantOwned(id); },
       shopRows: function () { return buildShopRows().map(function (r) { return { title: r.title, header: r.header, sub: r.sub, chips: (r.chips || []).map(function (c) { return { label: c.label, action: c.action, itemId: c.itemId }; }) }; }); },
       setShopScroll: function (y) { shopScroll = y; clampShopScroll(); },
-      clearHazardsForShot: function () { trees.length = 0; animals.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
+      clearHazardsForShot: function () { trees.length = 0; animals.length = 0; feathers.length = 0; hunters.length = 0; projectiles.length = 0; waterfalls.length = 0; },
+      spawnAnimalAt: function (kind, x, y, extra) { return pushAnimal(kind || "bat", x, y, extra || null); },
+      animalPlan: function () { return { byWorld: ANIMAL_BY_WORLD, eagle: EAGLE_WORLDS, every: WORLD_EVERY }; },
       artReady: function () { return !!PHOENIX_ART.ready; },
       shareTextNow: function () { return shareMessage(); },
       openShare: function () { shareRun(); return shareMessage(); },
