@@ -74,7 +74,7 @@ There is **one bird, a crimson-and-gold fire Phoenix** (the in-game id is still 
 |------:|------|------:|--------------|
 | 1 | Hatchling | 1 | - |
 | 2 | Fledgling | 3 | Coin Reach |
-| 3 | Sky Hopper | 5 | Glide |
+| 3 | Fire Hopper | 5 | Glide |
 | 4 | Breeze Glider | 8 | Dash skill |
 | 5 | Gale Wing | 11 | Second Chance |
 | 6 | Cloud Dancer | 15 | Rich Pickups |

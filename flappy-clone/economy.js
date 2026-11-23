@@ -508,7 +508,7 @@
   // —— v1.17: 20 evolution stages tied to LEVELS you reach. Stage n unlocks at EVO_LEVELS[n-1]; every stage after the first gives a free upgrade. ——
   const EVO_LEVELS = [1, 3, 5, 8, 11, 15, 19, 24, 29, 35, 41, 48, 55, 63, 72, 82, 93, 105, 120, 140,
     155, 172, 190, 210, 232, 256, 282, 310, 340, 372, 408, 448, 492, 540, 592, 650, 714, 784, 860, 1000];   // v1.17 stages 21-40: the war-machine line
-  const EVO_NAMES = ["Hatchling", "Fledgling", "Sky Hopper", "Breeze Glider", "Gale Wing", "Cloud Dancer", "Storm Rider", "Thunder Wing", "Aurora Flap", "Dawn Streamer",
+  const EVO_NAMES = ["Hatchling", "Fledgling", "Fire Hopper", "Breeze Glider", "Gale Wing", "Cloud Dancer", "Storm Rider", "Thunder Wing", "Aurora Flap", "Dawn Streamer",
     "Nova Beak", "Star Flyer", "Eclipse Crow", "Moon Weaver", "Comet Tail", "Celestial", "Sun Crown", "Skyfire", "Mythic Phoenix", "Sky Legend",
     "Rivet Rider", "Gear Glider", "Cog Crest", "Wind-Up Wing", "Brass Blaze", "Propeller Pup", "Rotor Hopper", "Twin Rotor", "Chopper Phoenix", "Skycopter",
     "Cadet Ace", "Wingman", "Squadron Lead", "Jet Phoenix", "Star Ace", "Dozer Bird", "Tread Titan", "Mech Phoenix", "Fortress Wing", "Grand Titan"];

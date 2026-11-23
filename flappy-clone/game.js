@@ -523,7 +523,7 @@
     // and some add a soft cool-toned glow or accent. The look is always the one teal Sparrow; the ladder never swaps its colours.
     { id: "hatchling", name: "Hatchling", accent: "none", feel: 0, palette: null },
     { id: "fledgling", name: "Fledgling", accent: "crest", feel: 0.01, palette: { glow: "rgba(70,220,205,0.40)" } },
-    { id: "sky_hopper", name: "Sky Hopper", accent: "glow", feel: 0.02, palette: { glow: "rgba(79,195,247,0.5)" } },
+    { id: "sky_hopper", name: "Fire Hopper", accent: "glow", feel: 0.02, palette: { glow: "rgba(79,195,247,0.5)" } },
     { id: "breeze", name: "Breeze Glider", accent: "none", feel: 0.03, palette: { glow: "rgba(120,220,255,0.42)" } },
     { id: "gale_wing", name: "Gale Wing", accent: "streaks", feel: 0.04, palette: { glow: "rgba(38,200,190,0.45)" } },
     { id: "cloud", name: "Cloud Dancer", accent: "glow", feel: 0.05, palette: { glow: "rgba(200,235,255,0.5)" } },
@@ -1361,9 +1361,6 @@
     g.fillStyle = "#ffffff";
     g.font = "bold 38px " + FONT;
     g.fillText("I scored " + score + " in Phoenix Go!", sw / 2, sh + 40);
-    g.fillStyle = "#9fe8ff";
-    g.font = "bold 24px " + FONT;
-    g.fillText("Free on Google Play", sw / 2, sh + 82);
     return c.toDataURL("image/jpeg", 0.9);
   }
 
@@ -2901,6 +2898,8 @@
   function bossBonusFor(lv) { return Math.min(20, 5 + Math.floor((lv | 0) / 20)); }
 
   let debugAuto = false;
+  let debugAimY = null;
+  let fairDie = "";
   // v1.18 pause: 0 running, 1 paused (panel), 2 resume countdown (3-2-1, 50 frames each)
   let pauseMode = 0, pauseCount = 0, pauseQuitArmed = false;
   const PAUSE_STEP = 50;
@@ -8074,14 +8073,15 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     blossom: "vulture", reef: "eel", volcano: "imp", candy: "gargoyle"
   };
   const FOE_STAT = {
-    bat: { r: 7, hp: 1, spd: 1.02 }, raven: { r: 11, hp: 1, spd: 0.78 },
-    wasp: { r: 5, hp: 1, spd: 0.4 }, eagle: { r: 18, hp: 4, spd: 0.48 },
-    drake: { r: 14, hp: 3, spd: 0.55 }, dragon: { r: 22, hp: 7, spd: 0.4 },
+    bat: { r: 7, hit: 5, hp: 1, spd: 0.7 }, raven: { r: 11, hit: 7, hp: 1, spd: 0.58 },
+    wasp: { r: 5, hit: 4, hp: 1, spd: 0.58 }, eagle: { r: 16, hit: 10, hp: 2, spd: 0.4 },
+    drake: { r: 12, hit: 8, hp: 2, spd: 0.48 }, dragon: { r: 18, hit: 11, hp: 5, spd: 0.32 },
     gargoyle: { r: 13, hp: 2, spd: 0.72 }, wraith: { r: 12, hp: 2, spd: 0.34 },
     frost: { r: 12, hp: 2, spd: 0.34 }, eel: { r: 10, hp: 3, spd: 0.62 },
-    vulture: { r: 12, hp: 2, spd: 0.86 }, imp: { r: 6, hp: 1, spd: 0.95 },
+    vulture: { r: 12, hit: 8, hp: 2, spd: 0.58 }, imp: { r: 6, hp: 1, spd: 0.95 },
     eye: { r: 11, hp: 2, spd: 0.3 }
   };
+  const BIRD_FOE = { bat: 1, raven: 1, vulture: 1, wasp: 1, eagle: 1, drake: 1, dragon: 1 };
   let dragonBossLevel = 0;
   function foeAlive(kind) {
     for (let i = 0; i < animals.length; i++) if (animals[i].kind === kind && !animals[i].dispersing) return true;
@@ -8117,9 +8117,9 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const a = {
       x: x, y: y, kind: kind, flying: true, hazard: true,
       phase: Math.random() * 6.28, bob: Math.random() * 6.28,
-      dispersing: 0, fade: 1, dmg: 0, hp: st.hp, r: st.r,
+      dispersing: 0, fade: 1, dmg: 0, hp: st.hp, r: st.r, hit: st.hit == null ? st.r : st.hit,
       vx: -(pipeSpeed * st.spd), vy: 0, zig: Math.random() < 0.5 ? 1 : -1,
-      gid: 0, wind: 0, glow: 0, recoil: 0, dive: 0, veil: 1, trail: []
+      gid: 0, wind: 0, glow: 0, recoil: 0, dive: 0, veil: 1, trail: [], homeY: y
     };
     if (extra) Object.assign(a, extra);
     animals.push(a);
@@ -8176,53 +8176,162 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     return true;
   }
   function breatheAt(a) {
-    if (a.x < bird.x + 90 || dragonShots.length >= 5) return;
-    const n = a.kind === "dragon" ? 2 : 1;
-    for (let i = 0; i < n; i++) {
-      const spread = (i - (n - 1) / 2) * (a.kind === "eye" ? 0 : 22);
-      const aim = bird.y - (a.y + spread);
-      dragonShots.push({
-        x: a.x - 16, y: a.y + spread,
-        vx: a.kind === "eye" ? -2.4 : (a.kind === "dragon" ? -2.0 : -1.65),
-        vy: a.kind === "eye" ? 0 : Math.max(-0.26, Math.min(0.26, aim * 0.0035)),
-        r: a.kind === "eye" ? 5 : (a.kind === "dragon" ? 9 : 7),
-        life: 140,
-        beam: a.kind === "eye"
-      });
+    if (a.x < bird.x + 90 || dragonShots.length >= 4) return;
+    if (a.kind === "eye") {
+      dragonShots.push({ x: a.x - 16, y: a.y, vx: -2.4, vy: 0, r: 5, life: 140, beam: true });
+      return;
     }
+    // One shot straight down this foe's own lane. It does not steer onto the phoenix.
+    dragonShots.push({
+      x: a.x - 12, y: a.y,
+      vx: a.kind === "dragon" ? -1.25 : -1.1,
+      vy: 0,
+      r: a.kind === "dragon" ? 7 : 6,
+      life: 120,
+      beam: false
+    });
   }
   function animalHit(x, y, rad, dmg) {
     let hit = false;
     for (let i = animals.length - 1; i >= 0; i--) {
       const a = animals[i];
       if (!a || a.dispersing) continue;
-      const dx = a.x - x, dy = a.y - y, rr = rad + a.r;
+      const dx = a.x - x, dy = a.y - y, rr = rad + a.r + 4;
       if (dx * dx + dy * dy < rr * rr) { hurtAnimal(a, dmg); hit = true; break; }
     }
     return hit;
   }
+  function laneRoom() {
+    return { minY: CAM_LANE - (W * 0.5 - 28), maxY: CAM_LANE + (W * 0.5 - 28) };
+  }
+  function foeAliveCount() {
+    let n = 0;
+    for (let i = 0; i < animals.length; i++) if (!animals[i].dispersing) n++;
+    return n;
+  }
+  function nearestGate() {
+    let gate = null;
+    for (let i = 0; i < pipes.length; i++) {
+      const q = pipes[i];
+      if (q.x + q.w > bird.x - 20 && (!gate || q.x < gate.x)) gate = q;
+    }
+    return gate;
+  }
+  // Keep bird enemies outside the open gate, so the corridor the phoenix is flying stays clear.
+  function foeSideY() {
+    const room = laneRoom();
+    const gate = nearestGate();
+    const by = gate ? gate.gapY : bird.y;
+    const half = gate ? gate.gap * 0.5 : 70;
+    const sign = (by - room.minY) < (room.maxY - by) ? 1 : -1;
+    let y = by + sign * (half + 52);
+    y = Math.max(room.minY + 16, Math.min(room.maxY - 16, y));
+    if (Math.abs(y - by) < half + 28) y = Math.max(room.minY + 16, Math.min(room.maxY - 16, by - sign * (half + 52)));
+    return y;
+  }
+  function fairBlocked(y, blocks) {
+    for (let i = 0; i < blocks.length; i++) if (y > blocks[i][0] && y < blocks[i][1]) return true;
+    return false;
+  }
+  function fairBlocks() {
+    const here = birdFocus();
+    const blocks = [];
+    function add(y, rad, x) {
+      if (x < here.x - 24 || x > here.x + 280) return;
+      const reach = bird.r + rad - 4;
+      blocks.push([y - reach, y + reach]);
+    }
+    for (let i = 0; i < animals.length; i++) {
+      const a = animals[i];
+      if (!a.dispersing && a.hazard && BIRD_FOE[a.kind]) add(a.y, a.hit != null ? a.hit : a.r, a.x);
+    }
+    for (let i = 0; i < dragonShots.length; i++) add(dragonShots[i].y, dragonShots[i].r, dragonShots[i].x);
+    return blocks;
+  }
+  function fairOpen() {
+    const blocks = fairBlocks();
+    if (!blocks.length) return 999;
+    const room = laneRoom();
+    let best = 0, run = 0;
+    for (let y = room.minY; y <= room.maxY; y += 4) {
+      if (!fairBlocked(y, blocks)) { run += 4; if (run > best) best = run; }
+      else run = 0;
+    }
+    return best;
+  }
+  function fairAim() {
+    const room = laneRoom();
+    let goal = CAM_LANE;
+    let gate = null;
+    const here = birdFocus();
+    for (let i = 0; i < pipes.length; i++) {
+      const q = pipes[i];
+      if (q.x + q.w > here.x - 20 && (!gate || q.x < gate.x)) gate = q;
+    }
+    if (gate) goal = gate.gapY;
+    const blocks = fairBlocks();
+    function pipeBlocks(y) {
+      if (!window.SkyHopObstacles) return false;
+      for (let i = 0; i < pipes.length; i++) {
+        const p = pipes[i];
+        if (p.x > here.x + 150 || p.x + p.w < here.x - 36) continue;
+        if (window.SkyHopObstacles.hitIndex(here.x, y, Math.max(4, bird.r - 2), p.x, p.gapY, p.bits, frame) >= 0) return true;
+      }
+      return false;
+    }
+    function ok(y) { return y >= room.minY && y <= room.maxY && !fairBlocked(y, blocks) && !pipeBlocks(y); }
+    if (ok(goal)) return goal;
+    let best = null, bestD = 1e9;
+    for (let y = room.minY; y <= room.maxY; y += 6) {
+      if (!ok(y)) continue;
+      const d = Math.abs(y - goal);
+      if (d < bestD) { bestD = d; best = y; }
+    }
+    return best == null ? goal : best;
+  }
+  function foeGroupYs(n, spread) {
+    const room = laneRoom();
+    const gate = nearestGate();
+    const y0 = foeSideY();
+    const sign = gate ? (y0 >= gate.gapY ? 1 : -1) : (y0 >= bird.y ? 1 : -1);
+    const ys = [];
+    for (let i = 0; i < n; i++) {
+      let y = y0 + sign * i * spread;
+      y = Math.max(room.minY + 14, Math.min(room.maxY - 14, y));
+      if (gate && Math.abs(y - gate.gapY) < gate.gap * 0.5 + 24) y = y0;
+      ys.push(y);
+    }
+    return ys;
+  }
   function spawnAnimal() {
     if (!extrasOn) return "";
     if (foeAlive("dragon")) return "hold";
+    const cap = level < 11 ? 2 : (level < 31 ? 3 : 4);
+    if (foeAliveCount() >= cap) return "hold";
     const kind = pickSpawnKind();
     if (kind === "hunter") { spawnHunter(); return "hunter"; }
-    let y0 = 70 + Math.random() * (PLAY_H - 160);
-    if (nearPipeGap(W + 36, y0, 30)) y0 = Math.max(48, Math.min(PLAY_H - 70, y0 + (y0 < PLAY_H / 2 ? 54 : -54)));
     const gid = frame + Math.random();
     if (kind === "bat" || kind === "imp") {
-      const n = level < 11 ? 2 : (level < 31 ? 2 : 3);
+      const n = kind === "imp" ? (level < 31 ? 2 : 3) : (level < 11 ? 1 : 2);
+      const ys = kind === "bat" ? foeGroupYs(n, 58) : null;
+      const y0 = ys ? ys[0] : (70 + Math.random() * (PLAY_H - 160));
       for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
-        pushAnimal(kind, W + 24 + i * 16, y0 + (i - (n - 1) / 2) * 26, { gid: gid, zig: i % 2 ? 1 : -1, phase: i * 1.3 });
+        const y = ys ? ys[i] : y0 + (i - (n - 1) / 2) * 26;
+        const a = pushAnimal(kind, W + 28 + i * 18, y, { gid: gid, zig: i % 2 ? 1 : -1, phase: i * 1.3 });
+        a.homeY = y;
       }
     } else if (kind === "wasp") {
-      const n = level < 31 ? 3 : 4;
+      const n = level < 31 ? 2 : 3;
+      const ys = foeGroupYs(n, 36);
       for (let i = 0; i < n && animals.length < MAX_ANIMALS; i++) {
-        const ang = (i / n) * Math.PI * 2;
-        pushAnimal("wasp", W + 30 + Math.cos(ang) * 14, y0 + Math.sin(ang) * 16, { gid: gid, phase: ang });
+        const a = pushAnimal("wasp", W + 34 + i * 14, ys[i], { gid: gid, phase: i * 1.4 });
+        a.homeY = ys[i];
       }
     } else if (animals.length < MAX_ANIMALS) {
-      const ahead = kind === "dragon" ? 280 : (kind === "drake" ? 200 : 36);
-      pushAnimal(kind, bird.x + ahead, y0, { gid: gid, boss: kind === "dragon" ? 1 : 0 });
+      const y = BIRD_FOE[kind] ? foeSideY() : (70 + Math.random() * (PLAY_H - 160));
+      const ahead = kind === "dragon" ? 250 : (kind === "drake" || kind === "eagle" ? 210 : 40);
+      const a = pushAnimal(kind, bird.x + ahead, y, { gid: gid, boss: kind === "dragon" ? 1 : 0 });
+      a.homeY = y;
       if (kind === "dragon") dragonBossLevel = level;
     }
     return kind;
@@ -8295,8 +8404,8 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         if (nextAnimal <= 0 && level >= 2) {
           let spawned = "";
           if (animals.length < MAX_ANIMALS) spawned = spawnAnimal();
-          const base = level < 11 ? 320 : (level < 31 ? 180 : 125);
-          nextAnimal = base + (spawned === "dragon" || spawned === "eagle" ? 220 : spawned === "hold" ? 80 : 0);
+          const base = level < 11 ? 540 : (level < 31 ? 360 : 220);
+          nextAnimal = base + (spawned === "dragon" || spawned === "eagle" ? 240 : spawned === "hold" ? 90 : 0);
         }
         nextWaterfall -= k;
         if (nextWaterfall <= 0 && level >= 5) {
@@ -8318,6 +8427,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         const tw = t.trunkW || 16;
         const th = 70 * t.scale;
         if (circleRect(birdFocus().x, birdFocus().y, bird.r - 2, t.x - tw / 2, PLAY_H - th, tw, th)) {
+          fairDie = "tree";
           gameOver();
           return;
         }
@@ -8351,17 +8461,44 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         continue;
       }
       if (a.recoil > 0) { a.recoil--; a.x += 1.5; }
-      if (a.kind === "bat" || a.kind === "imp") {
+      if (a.kind === "bat") {
+        a.x += a.vx * k;
+        a.y += Math.sin(a.phase) * 0.55 * (a.zig || 1);
+        const home = a.homeY == null ? a.y : a.homeY;
+        a.y += Math.max(-0.35, Math.min(0.35, (home - a.y) * 0.04));
+      } else if (a.kind === "imp") {
         a.x += a.vx * k;
         a.y += Math.sin(a.phase) * 2.1 * (a.zig || 1);
       } else if (a.kind === "raven" || a.kind === "vulture") {
-        a.x += a.vx * k;
-        const pull = (bird.y - a.y) * (a.kind === "vulture" ? 0.045 : 0.03);
-        a.vy = (a.vy || 0) * 0.9 + Math.max(-1.35, Math.min(1.35, pull));
-        a.y += a.vy;
+        a.wind = (a.wind | 0) + 1;
+        if (a.wind < 32) {
+          a.glow = 1;
+          a.x += a.vx * 0.32 * k;
+        } else {
+          a.glow = 0;
+          if (a.lockY == null) a.lockY = a.homeY == null ? a.y : a.homeY;
+          a.x += a.vx * k;
+          a.y += Math.max(-0.7, Math.min(0.7, (a.lockY - a.y) * 0.08));
+          a.y += Math.sin(a.phase) * 0.28;
+        }
       } else if (a.kind === "wasp") {
         a.x += a.vx * k;
-        a.y += Math.max(-0.48, Math.min(0.48, (bird.y - a.y) * 0.016)) + Math.sin(a.phase) * 0.35;
+        const home = a.homeY == null ? a.y : a.homeY;
+        a.y += Math.max(-0.22, Math.min(0.22, (home - a.y) * 0.05)) + Math.sin(a.phase) * 0.22;
+      } else if (a.kind === "eagle") {
+        a.wind = (a.wind | 0) + 1;
+        if (a.wind < 40) {
+          a.glow = 1;
+          a.x += a.vx * 0.28 * k;
+        } else if (a.wind < 78) {
+          a.glow = 0;
+          if (a.lockY == null) a.lockY = a.homeY == null ? a.y : a.homeY;
+          a.x += a.vx * 1.25 * k;
+          a.y += Math.max(-0.75, Math.min(0.75, (a.lockY - a.y) * 0.1));
+        } else {
+          a.x += a.vx * k;
+          a.y += Math.sin(a.phase) * 0.25;
+        }
       } else if (a.kind === "wraith" || a.kind === "frost") {
         a.x += a.vx * 0.65 * k;
         a.y += Math.sin(a.phase * 0.8) * 0.9;
@@ -8379,21 +8516,32 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
           a.x += a.vx * 1.7 * k;
           a.y += Math.max(-2.1, Math.min(2.1, (bird.y - a.y) * 0.07));
         } else a.dive = 0;
-      } else if (a.kind === "drake" || a.kind === "dragon" || a.kind === "eye") {
-        const hold = bird.x + (a.kind === "dragon" ? 220 : 168);
+      } else if (a.kind === "drake" || a.kind === "dragon") {
+        const home = a.homeY == null ? a.y : a.homeY;
+        const span = a.kind === "dragon" ? 26 : 16;
+        const lane = home + Math.sin(a.phase * 0.32) * span;
+        a.x += a.vx * k;
+        a.y += Math.max(-0.65, Math.min(0.65, (lane - a.y) * 0.06));
+        if (a.x < bird.x + 250 && a.x > bird.x + 80) {
+          a.wind = (a.wind | 0) + 1;
+          const need = a.kind === "dragon" ? 96 : 74;
+          a.glow = a.wind > need - 30 ? 1 : 0;
+          if (a.wind >= need) { a.wind = 0; a.glow = 0; breatheAt(a); }
+        }
+      } else if (a.kind === "eye") {
+        const hold = bird.x + 168;
         if (a.x > hold + 24) a.x += a.vx * k;
         else a.x += (hold - a.x) * 0.05;
         const lane = PLAY_H * (0.32 + 0.36 * (0.5 + 0.5 * Math.sin(a.phase * 0.35)));
         a.y += Math.max(-1.05, Math.min(1.05, (lane - a.y) * 0.045));
         if (a.x < hold + 50) {
           a.wind = (a.wind | 0) + 1;
-          const need = a.kind === "dragon" ? 70 : 54;
-          a.glow = a.wind > need - 22 ? 1 : 0;
-          if (a.wind >= need) { a.wind = 0; a.glow = 0; breatheAt(a); }
+          a.glow = a.wind > 32 ? 1 : 0;
+          if (a.wind >= 54) { a.wind = 0; a.glow = 0; breatheAt(a); }
         }
       } else {
         a.x += a.vx * k;
-        a.y += Math.sin(a.phase) * 0.45 + Math.max(-0.35, Math.min(0.35, (bird.y - a.y) * 0.008));
+        a.y += Math.sin(a.phase) * 0.45;
       }
       if (a.y < 28) a.y = 28;
       else if (a.y > PLAY_H - 28) a.y = PLAY_H - 28;
@@ -8401,8 +8549,10 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         const here = birdFocus();
         const dx = here.x - a.x;
         const dy = here.y - a.y;
-        const rr = bird.r + a.r - 3;
+        const body = a.hit != null ? a.hit : a.r;
+        const rr = bird.r + body - 4;
         if (dx * dx + dy * dy < rr * rr) {
+          fairDie = "animal:" + a.kind;
           gameOver();
           return;
         }
@@ -8427,6 +8577,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         const here = birdFocus();
         const dx = here.x - s.x, dy = here.y - s.y, rr = bird.r + s.r - 4;
         if (dx * dx + dy * dy < rr * rr) {
+          fairDie = "breath";
           dragonShots.splice(i, 1);
           gameOver();
           return;
@@ -8451,6 +8602,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         // Body collision
         if (!(h.stun > 0) && circleRect(birdFocus().x, birdFocus().y, bird.r - 2, h.x - 14 * (h.sc || 1), h.y - 18 * (h.sc || 1), 28 * (h.sc || 1), 36 * (h.sc || 1))) {
           if (tryTalonSmash("hunter", i)) continue;
+          fairDie = "hunter";
           gameOver();
           return;
         }
@@ -8471,6 +8623,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
         const rr = bird.r + p.r - 3;
         if (dx * dx + dy * dy < rr * rr) {
           if (tryTalonSmash("projectile", i)) continue;
+          fairDie = "shot";
           gameOver();
           return;
         }
@@ -8564,11 +8717,11 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     const boosting = dashing || puMode === "rocket";
     if (boosting && window.SkyHopFlight) window.SkyHopFlight.stepBoost(bird);
     if (window.SkyHopFlight && window.SkyHopFlight.stepFollow) {
-      const aimX = keySteer ? bird.y + keySteer * 90 : (CAM_LANE + (followSX - W * 0.5));
+      const aimX = debugAimY != null ? debugAimY : (keySteer ? bird.y + keySteer * 90 : (CAM_LANE + (followSX - W * 0.5)));
       window.SkyHopFlight.stepFollow(bird, {
-        down: followOn || keySteer !== 0,
+        down: debugAimY != null || followOn || keySteer !== 0,
         aimX: aimX,
-        fingerY: followOn ? followSY : birdScreenY,
+        fingerY: debugAimY != null ? birdScreenY + 46 : (followOn ? followSY : birdScreenY),
         restX: CAM_LANE,
         restY: BIRD_REST_Y,
         bandTop: BIRD_AHEAD_Y,
@@ -8627,6 +8780,7 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       if (turnSafe <= 0 && !(ghostPipesLeft > 0 || p.ghostPass || puMode) && hitPipe(p)) {
         // Grace: emerging from a dash/shield hit inside a pipe shouldn't insta-kill
         if (invulnFrames > 0 && invulnFrames < 4 && graceBudget > 0) invulnFrames = 3;
+        fairDie = "gate";
         gameOver();
         if (state !== State.PLAY) return;
       }
@@ -8879,6 +9033,13 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
     ctx.translate(s.x, s.y);
     const veil = (a.kind === "wraith" || a.kind === "frost") ? (a.veil == null ? 1 : a.veil) : 1;
     ctx.globalAlpha = Math.max(0, (a.fade == null ? 1 : a.fade) * veil);
+    if (a.glow && !a.dispersing) {
+      ctx.strokeStyle = "rgba(255,186,70,0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 4, (a.hit || a.r) + 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     if (a.kind === "bat" || a.kind === "imp") drawBatBody(flap, a.kind === "imp");
     else if (a.kind === "raven" || a.kind === "vulture") drawRavenBody(flap, a.kind === "vulture");
     else if (a.kind === "wasp") drawWaspBody(flap);
@@ -14439,6 +14600,85 @@ function zapFx(x, y, k) { k = fxK(k); for (let i = 0; i < k; i++) { const a = Ma
       artReady: function () { return !!PHOENIX_ART.ready; },
       shareTextNow: function () { return shareMessage(); },
       shareCardNow: function () { return captureShareImage(); },
+      fairRun: function (lv, foes) {
+        this.shotSetup(lv);
+        freeze112 = false;
+        extrasOn = foes !== false;
+        nextAnimal = 30;
+        dragonBossLevel = 0;
+        fairDie = "";
+        debugAimY = null;
+        const startLevel = level;
+        let frames = 0, died = false, minOpen = 999, birdFoes = 0;
+        const seen = {};
+        while (frames < 4200 && level === startLevel && state === State.PLAY) {
+          debugAimY = fairAim();
+          const open = fairOpen();
+          if (open < minOpen) minOpen = open;
+          for (let i = 0; i < animals.length; i++) {
+            const a = animals[i];
+            if (!a.dispersing && BIRD_FOE[a.kind]) { birdFoes++; seen[a.kind] = (seen[a.kind] || 0) + 1; }
+          }
+          update();
+          frames++;
+          if (state !== State.PLAY) { died = true; break; }
+        }
+        debugAimY = null;
+        return { ok: !died && level > startLevel, died: died, why: fairDie, frames: frames, level: level, minOpen: minOpen, birdFoes: birdFoes, seen: seen };
+      },
+      foePass: function (kind) {
+        this.shotSetup(6);
+        freeze112 = false;
+        pipes.length = 0;
+        nextSpawn = 99999;
+        animals.length = 0; dragonShots.length = 0; hunters.length = 0; projectiles.length = 0;
+        fairDie = "";
+        const n = kind === "bat" || kind === "wasp" ? 2 : 1;
+        const ys = foeGroupYs(n, kind === "wasp" ? 34 : 56);
+        for (let i = 0; i < n; i++) {
+          const a = pushAnimal(kind, bird.x + 230, ys[i], { homeY: ys[i], gid: 1 });
+          a.homeY = ys[i];
+        }
+        let frames = 0, minOpen = 999;
+        while (frames < 260 && state === State.PLAY) {
+          const open = fairOpen();
+          if (open < minOpen) minOpen = open;
+          const blocks = fairBlocks();
+          let aim = bird.y;
+          if (fairBlocked(bird.y, blocks)) {
+            const room = laneRoom();
+            for (let y = room.minY; y <= room.maxY; y += 6) {
+              if (!fairBlocked(y, blocks)) { aim = y; break; }
+            }
+          }
+          debugAimY = aim;
+          update();
+          frames++;
+        }
+        debugAimY = null;
+        return { kind: kind, ok: state === State.PLAY && minOpen >= 96, why: fairDie, frames: frames, minOpen: minOpen, state: state };
+      },
+      strikeFoe: function (kind) {
+        this.shotSetup(8);
+        freeze112 = false;
+        bird.screenY = BIRD_REST_Y;
+        birdScreenY = BIRD_REST_Y;
+        animals.length = 0; dragonShots.length = 0;
+        const y = bird.y;
+        const a = pushAnimal(kind || "raven", bird.x + 120, y, { homeY: y, lockY: y, wind: 80, vx: -0.15 });
+        fireballs.length = 0; fireArrows.length = 0; meteors.length = 0;
+        heldWeapon = { kind: "fireball", ammo: 6, max: 6 };
+        weaponFiring = true; keyFire = true; fireCd = 0;
+        let steps = 0;
+        while (steps < 80 && a.dmg < 1 && animals.indexOf(a) >= 0 && !a.dispersing) {
+          debugAimY = y;
+          update();
+          steps++;
+        }
+        debugAimY = null;
+        keyFire = false; weaponFiring = false; heldWeapon = null;
+        return { kind: kind, dmg: a.dmg | 0, gone: animals.indexOf(a) < 0 || !!a.dispersing, steps: steps };
+      },
       openShare: function () { shareRun(); return shareMessage(); },
       showOver: function (sc, lv) {
         dailyMode = false; levelCard = null; state = State.OVER;

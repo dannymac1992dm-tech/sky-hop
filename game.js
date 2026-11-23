@@ -533,7 +533,7 @@
       },
     },
     {
-      id: "sky_hopper", name: "Sky Hopper", accent: "glow", feel: 0.05,
+      id: "sky_hopper", name: "Fire Hopper", accent: "glow", feel: 0.05,
       palette: {
         body0: "#e1f5fe", body1: "#29b6f6", body2: "#01579b",
         wing: "#4fc3f7", wingDark: "#0277bd", belly: "rgba(200,240,255,0.6)",
@@ -1397,9 +1397,6 @@
     g.fillStyle = "#ffffff";
     g.font = "bold 38px " + FONT;
     g.fillText("I scored " + score + " in Phoenix Go!", sw / 2, sh + 40);
-    g.fillStyle = "#9fe8ff";
-    g.font = "bold 24px " + FONT;
-    g.fillText("Free on Google Play", sw / 2, sh + 82);
     return c.toDataURL("image/jpeg", 0.9);
   }
 
