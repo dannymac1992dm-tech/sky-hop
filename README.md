@@ -74,7 +74,7 @@ During a run the bird **evolves every 10 pipes** (`tier = floor(score / 10)`). S
 |-----:|--------|------|
 | 0 | 1–9 | Hatchling |
 | 1 | 5–9 | Fledgling |
-| 2 | 20–29 | Sky Hopper |
+| 2 | 20–29 | Fire Hopper |
 | 3 | 30–39 | Gale Wing |
 | 4 | 40–49 | Storm Rider |
 | 5 | 50–59 | Aurora Flap |

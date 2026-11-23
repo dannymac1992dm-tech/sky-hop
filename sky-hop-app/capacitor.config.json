@@ -1,0 +1,11 @@
+{
+  "appId": "com.skyhop.mobile",
+  "appName": "Phoenix Go",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
